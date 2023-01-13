@@ -1,10 +1,11 @@
-package models
+package model
 
 import (
 	"context"
 	"errors"
 
 	messages "github.com/cucumber/messages/go/v21"
+	"github.com/testernetes/bdk/scheme"
 )
 
 type Feature struct {
@@ -19,7 +20,7 @@ type Feature struct {
 	Scenarios []*Scenario // or Scenario Outline
 }
 
-func NewFeature(featureDoc *messages.Feature, scheme *scheme) (*Feature, error) {
+func NewFeature(featureDoc *messages.Feature, scheme *scheme.Scheme) (*Feature, error) {
 	f := &Feature{
 		Location:    featureDoc.Location,
 		Tags:        featureDoc.Tags,

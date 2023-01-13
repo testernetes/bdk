@@ -3,10 +3,10 @@ package formatters
 import (
 	"fmt"
 
-	"github.com/testernetes/bdk/models"
+	"github.com/testernetes/bdk/model"
 )
 
-func Print(name string, feature *models.Feature) {
+func Print(name string, feature *model.Feature) {
 	switch name {
 	case "json":
 		JSON(feature)

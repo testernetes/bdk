@@ -5,23 +5,23 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/testernetes/bdk/models"
+	"github.com/testernetes/bdk/model"
 )
 
-func Simple(feature *models.Feature) {
+func Simple(feature *model.Feature) {
 	color.Set(color.FgWhite)
 	printf(feature, fmt.Sprintf("%s: %s", feature.Keyword, feature.Name))
 	for _, scenario := range feature.Scenarios {
 		printf(scenario, fmt.Sprintf("%s: %s", scenario.Keyword, scenario.Name))
 		for _, step := range scenario.Steps {
 			switch step.Execution.Result {
-			case models.Passed:
+			case model.Passed:
 				color.Set(color.FgGreen)
-			case models.Skipped:
+			case model.Skipped:
 				color.Set(color.FgBlue)
-			case models.Timedout, models.Failed:
+			case model.Timedout, model.Failed:
 				color.Set(color.FgYellow)
-			case models.Unknown, models.Interrupted:
+			case model.Unknown, model.Interrupted:
 				color.Set(color.FgRed)
 			}
 
@@ -44,7 +44,7 @@ func Simple(feature *models.Feature) {
 
 func printf(t interface{}, s interface{}) {
 	switch t.(type) {
-	case *models.Scenario:
+	case *model.Scenario:
 		fmt.Printf(indent(2, s))
 	default:
 		fmt.Printf(indent(0, s))

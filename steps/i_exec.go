@@ -4,30 +4,20 @@ import (
 	"context"
 
 	. "github.com/onsi/gomega"
+	"github.com/testernetes/bdk/arguments"
 	"github.com/testernetes/bdk/client"
-	"github.com/testernetes/bdk/models"
+	"github.com/testernetes/bdk/parameters"
 	"github.com/testernetes/bdk/register"
-	"github.com/testernetes/bdk/sessions"
+	"github.com/testernetes/bdk/scheme"
+	"github.com/testernetes/bdk/session"
 	"github.com/testernetes/gkube"
 )
 
 func init() {
-	err := models.Scheme.Register(IExecInContainer)
-	if err != nil {
-		panic(err)
-	}
-	err = models.Scheme.Register(IExecInDefaultContainer)
-	if err != nil {
-		panic(err)
-	}
-	err = models.Scheme.Register(IExecScriptInContainer)
-	if err != nil {
-		panic(err)
-	}
-	err = models.Scheme.Register(IExecScriptInDefaultContainer)
-	if err != nil {
-		panic(err)
-	}
+	scheme.Default.AddToScheme(IExecInContainer)
+	scheme.Default.AddToScheme(IExecInDefaultContainer)
+	scheme.Default.AddToScheme(IExecScriptInContainer)
+	scheme.Default.AddToScheme(IExecScriptInDefaultContainer)
 }
 
 var IExecFunc = func(ctx context.Context, cmd []string, ref, container string) error {
@@ -44,12 +34,12 @@ var IExecFunc = func(ctx context.Context, cmd []string, ref, container string) e
 		return err
 	}).WithContext(ctx).Should(Succeed(), "Could not exec in container")
 
-	sessions.Save(ctx, ref, s)
+	session.Save(ctx, ref, s)
 
 	return nil
 }
 
-var IExecScriptFunc = func(ctx context.Context, ref, container string, script *models.DocString) error {
+var IExecScriptFunc = func(ctx context.Context, ref, container string, script *arguments.DocString) error {
 	shell := script.MediaType
 	if shell == "" {
 		shell = "/bin/sh"
@@ -58,31 +48,31 @@ var IExecScriptFunc = func(ctx context.Context, ref, container string, script *m
 	return IExecFunc(ctx, []string{shell, "-c", cmd}, ref, container)
 }
 
-var IExecInContainer = models.StepDefinition{
+var IExecInContainer = scheme.StepDefinition{
 	Name: "i-exec-in-container",
 	Text: "I exec <command> in <reference>/<container>",
 	Help: "Executes the given command in a shell in the referenced pod and container.",
 	Examples: `
 	When I exec "echo helloworld" in pod/app`,
-	Parameters: []models.Parameter{models.Command, models.Reference, models.Container},
+	Parameters: []parameters.Parameter{parameters.Command, parameters.Reference, parameters.Container},
 	Function: func(ctx context.Context, cmd string, ref, container string) error {
 		return IExecFunc(ctx, []string{"/bin/sh", "-c", cmd}, ref, container)
 	},
 }
 
-var IExecInDefaultContainer = models.StepDefinition{
+var IExecInDefaultContainer = scheme.StepDefinition{
 	Name: "i-exec",
 	Text: "I exec <command> in <reference>",
 	Help: "Executes the given command in a shell in the referenced pod and default container.",
 	Examples: `
 	When I exec "echo helloworld" in pod`,
-	Parameters: []models.Parameter{models.Command, models.Reference},
+	Parameters: []parameters.Parameter{parameters.Command, parameters.Reference},
 	Function: func(ctx context.Context, cmd, ref string) error {
 		return IExecFunc(ctx, []string{"/bin/sh", "-c", cmd}, ref, "")
 	},
 }
 
-var IExecScriptInContainer = models.StepDefinition{
+var IExecScriptInContainer = scheme.StepDefinition{
 	Name: "i-exec-script-in-container",
 	Text: "I exec this script in <reference>/<container>",
 	Help: "Executes the given script in a shell in the referenced pod and container.",
@@ -91,11 +81,11 @@ var IExecScriptInContainer = models.StepDefinition{
 	  """/bin/bash
 	  curl localhost:8080/ready
 	  """`,
-	Parameters: []models.Parameter{models.Command, models.Reference, models.Container, models.Script},
+	Parameters: []parameters.Parameter{parameters.Command, parameters.Reference, parameters.Container, parameters.Script},
 	Function:   IExecScriptFunc,
 }
 
-var IExecScriptInDefaultContainer = models.StepDefinition{
+var IExecScriptInDefaultContainer = scheme.StepDefinition{
 	Name: "i-exec-script",
 	Text: "I exec this script in <reference>",
 	Help: "Executes the given script in a shell in the referenced pod and default container.",
@@ -104,8 +94,8 @@ var IExecScriptInDefaultContainer = models.StepDefinition{
 	  """/bin/bash
 	  curl localhost:8080/ready
 	  """`,
-	Parameters: []models.Parameter{models.Command, models.Reference, models.Script},
-	Function: func(ctx context.Context, ref string, script *models.DocString) error {
+	Parameters: []parameters.Parameter{parameters.Command, parameters.Reference, parameters.Script},
+	Function: func(ctx context.Context, ref string, script *arguments.DocString) error {
 		return IExecScriptFunc(ctx, ref, "", script)
 	},
 }

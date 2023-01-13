@@ -10,7 +10,7 @@ Feature: basic
       namespace: default
     """
     When I create cm
-    Then within 1s cm jsonpath '{.metadata.name}' should equal example
+    Then within 10s cm jsonpath '{.metadata.name}' should equal example
     And I delete cm
     | propagation policy | Foreground |
 

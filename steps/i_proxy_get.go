@@ -6,11 +6,12 @@ import (
 	"regexp"
 	"time"
 
-	messages "github.com/cucumber/messages/go/v21"
 	. "github.com/onsi/gomega"
+	"github.com/testernetes/bdk/arguments"
 	"github.com/testernetes/bdk/client"
-	"github.com/testernetes/bdk/models"
+	"github.com/testernetes/bdk/parameters"
 	"github.com/testernetes/bdk/register"
+	"github.com/testernetes/bdk/scheme"
 	"github.com/testernetes/gkube"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -18,13 +19,10 @@ import (
 )
 
 func init() {
-	err := models.Scheme.Register(IProxyGet)
-	if err != nil {
-		panic(err)
-	}
+	scheme.Default.MustAddToScheme(IProxyGet)
 }
 
-var IProxyGetFunc = func(ctx context.Context, scheme, ref, port, path string, options *messages.DataTable) error {
+var IProxyGetFunc = func(ctx context.Context, scheme, ref, port, path string, options *arguments.DataTable) error {
 	u := register.Load(ctx, ref)
 	Expect(u).ShouldNot(BeNil(), ErrNoResource, ref)
 
@@ -60,7 +58,7 @@ var IProxyGetFunc = func(ctx context.Context, scheme, ref, port, path string, op
 	return nil
 }
 
-var IProxyGet = models.StepDefinition{
+var IProxyGet = scheme.StepDefinition{
 	Name: "i-proxy-get",
 	Text: "I proxy get <scheme>://<reference>:<port><path>",
 	Help: `Create a proxy connection to the referenced pod resource and attempts a http(s) GET for the port and path.
@@ -84,13 +82,13 @@ var IProxyGet = models.StepDefinition{
 	And within 1m pod jsonpath '{.status.phase}' should equal Running
 	And I proxy get http://app:8000/fake
 	Then pod response code should equal 404`,
-	Parameters: []models.Parameter{models.URLScheme, models.Reference, models.Port, models.URLPath, models.ProxyGetOptions},
+	Parameters: []parameters.Parameter{parameters.URLScheme, parameters.Reference, parameters.Port, parameters.URLPath, parameters.ProxyGetOptions},
 	Function:   IProxyGetFunc,
 }
 
-var IProxyGetHTTP = models.StepDefinition{
+var IProxyGetHTTP = scheme.StepDefinition{
 	Expression: regexp.MustCompile(fmt.Sprintf(`^I proxy get %s%s%s$`, NamedObj, Port, URLPath)),
-	Function: func(ctx context.Context, ref, port, path string, options *messages.DataTable) error {
+	Function: func(ctx context.Context, ref, port, path string, options *arguments.DataTable) error {
 		return IProxyGetFunc(ctx, "", ref, port, path, options)
 	},
 	Name: "i-proxy-get",

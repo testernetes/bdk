@@ -1,4 +1,4 @@
-package models
+package scheme_test
 
 import (
 	"context"
@@ -10,9 +10,11 @@ import (
 	messages "github.com/cucumber/messages/go/v21"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/testernetes/bdk/parameters"
+	"github.com/testernetes/bdk/scheme"
 )
 
-var basicGoodStep = StepDefinition{
+var GoodStep = scheme.StepDefinition{
 	Expression: regexp.MustCompile("a (.*)"),
 	Function: func(ctx context.Context, s string) error {
 		if len(s) > 1 {
@@ -22,7 +24,7 @@ var basicGoodStep = StepDefinition{
 	},
 }
 
-var basicStepWithoutContext = StepDefinition{
+var StepWithoutContext = scheme.StepDefinition{
 	Expression: regexp.MustCompile("a (.*)"),
 	Function: func(s string) error {
 		if len(s) > 1 {
@@ -32,111 +34,77 @@ var basicStepWithoutContext = StepDefinition{
 	},
 }
 
-var basicStepWithoutArgs = StepDefinition{
+var StepWithoutArgs = scheme.StepDefinition{
 	Expression: regexp.MustCompile("a (.*)"),
 	Function: func() error {
 		return nil
 	},
 }
 
-var basicStepWithoutFunc = StepDefinition{
+var StepWithoutFunc = scheme.StepDefinition{
 	Expression: regexp.MustCompile("a (.*)"),
 	Function:   "notafunction",
 }
 
-var basicStepTooFewArgs = StepDefinition{
+var StepTooFewArgs = scheme.StepDefinition{
 	Expression: regexp.MustCompile("a (.*)"),
 	Function: func(ctx context.Context) error {
 		return nil
 	},
 }
 
-var basicStepTooManyArgs = StepDefinition{
+var StepTooManyArgs = scheme.StepDefinition{
 	Expression: regexp.MustCompile("a (.*)"),
 	Function: func(ctx context.Context, s, b string) error {
 		return nil
 	},
 }
 
-var basicGoodDocStringStep = StepDefinition{
+var GoodDocStringStep = scheme.StepDefinition{
 	Expression: regexp.MustCompile("find all (.*) in:"),
 	Function: func(ctx context.Context, s string, doc *DocString) error {
 		return nil
 	},
 }
 
-var basicTooManyDocStringStep = StepDefinition{
+var TooManyDocStringStep = scheme.StepDefinition{
 	Expression: regexp.MustCompile("find all (.*) in:"),
 	Function: func(ctx context.Context, s string, doc *DocString, doc2 *DocString) error {
 		return nil
 	},
 }
 
-var basicGoodDataTableStep = StepDefinition{
+var GoodDataTableStep = scheme.StepDefinition{
 	Expression: regexp.MustCompile("find all (.*) in:"),
 	Function: func(ctx context.Context, s string, doc *messages.DataTable) error {
 		return nil
 	},
 }
 
-var basicTooManyArgStep = StepDefinition{
+var TooManyArgStep = scheme.StepDefinition{
 	Expression: regexp.MustCompile("a (.*)"),
 	Function: func(ctx context.Context, s string, doc *messages.DataTable) error {
 		return nil
 	},
 }
 
-var _ = Describe("Registering Steps", func() {
-
-	Context("Registering Basic Steps", func() {
-
-		It("should register a basic good step", func() {
-			scheme := Scheme{}
-			Expect(scheme.Register(basicGoodStep)).Should(Succeed())
-		})
-
-		It("should not register a basic step without a context", func() {
-			scheme := Scheme{}
-			Expect(scheme.Register(basicStepWithoutContext)).Should(MatchError(ErrMustHaveContext))
-		})
-
-		It("should not register a basic step without any arguments", func() {
-			scheme := Scheme{}
-			Expect(scheme.Register(basicStepWithoutArgs)).Should(MatchError(ErrMustHaveContext))
-		})
-
-		It("should not register a basic step without a function", func() {
-			scheme := Scheme{}
-			Expect(scheme.Register(basicStepWithoutFunc)).Should(MatchError(ErrStepDefinitionMustHaveFunc))
-		})
-
-		It("should not register a basic step which has too few args for the regular expression", func() {
-			scheme := Scheme{}
-			Expect(scheme.Register(basicStepTooFewArgs)).Should(MatchError(ErrTooFewArguments))
-		})
-
-		It("should not register a basic step which has too many args for the regular expression", func() {
-			scheme := Scheme{}
-			Expect(scheme.Register(basicStepTooManyArgs)).Should(MatchError(ErrTooManyArguments))
-		})
-	})
-
-	Context("Registering Steps with DocString or DataTable Arguments", func() {
-
-		It("should register a good step with DocString", func() {
-			scheme := Scheme{}
-			Expect(scheme.Register(basicGoodDocStringStep)).Should(Succeed())
-		})
-
-		It("should register a good step with DataTable", func() {
-			scheme := Scheme{}
-			Expect(scheme.Register(basicGoodDataTableStep)).Should(Succeed())
-		})
-
-		It("should not register a step with two DocString", func() {
-			scheme := Scheme{}
-			Expect(scheme.Register(basicTooManyDocStringStep)).Should(MatchError(ErrTooManyArguments))
-		})
+var _ = Describe("Scheme", func() {
+	Context("Adding Steps to Scheme", func() {
+		DescribeTable("AddToScheme function",
+			func(step scheme.StepDefinition, m GomegaMatcher) {
+				s := scheme.Scheme{}
+				Expect(scheme.AddToScheme(step)).Should(m)
+			},
+			Entry("should register a good step", GoodStep, Succeed()),
+			Entry("should not register a  step without a context", StepWithoutContext, MatchError(ErrMustHaveContext)),
+			Entry("should not register a  step without any arguments", StepWithoutArgs, MatchError(ErrMustHaveContext)),
+			Entry("should not register a  step without a function", StepWithoutFunc, MatchError(ErrStepDefinitionMustHaveFunc)),
+			Entry("should not register a  step which has too few args for the regular expression", StepTooFewArgs, MatchError(ErrTooFewArguments)),
+			Entry("should not register a  step which has too many args for the regular expression", StepTooManyArgs, MatchError(ErrTooManyArguments)),
+			Entry("should register a good step with DocString", GoodDocStringStep, Succeed()),
+			Entry("should register a good step with DataTable", GoodDataTableStep, Succeed()),
+			Entry("should not register a step with two DocString", TooManyDocStringStep, MatchError(ErrTooManyArguments)),
+		)
 	})
 })
 
@@ -145,19 +113,18 @@ var _ = Describe("Hydrating a Step", func() {
 	Context("Applying a Step Definition to a Step", func() {
 		DescribeTable("Applying a matching step definition to a step",
 			func(text string, arg interface{}, f interface{}) {
-				var step = &Step{
-					Text: text,
-				}
-				var stepDef = StepDefinition{
+				var stepDef = scheme.StepDefinition{
 					Expression: regexp.MustCompile("a (.*)"),
 					Function:   f,
 				}
-				scheme := Scheme{}
-				Expect(scheme.Register(stepDef)).Should(Succeed())
-				Expect(scheme.StepDefFor(step)).Should(Succeed())
-				Expect(step.Func).Should(Equal(reflect.ValueOf(f)))
-				Expect(step.Args).Should(HaveLen(1))
-				Expect(step.Args[0].Interface()).Should(Equal(arg))
+				s := Scheme{}
+				Expect(s.AddToScheme(stepDef)).Should(Succeed())
+
+				stepFunc, stepArgs, err := s.StepDefFor(text)
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(stepFunc).Should(Equal(reflect.ValueOf(f)))
+				Expect(stepArgs).Should(HaveLen(1))
+				Expect(stepArgs[0].Interface()).Should(Equal(arg))
 			},
 			Entry("When arg is a string", "a word", "word", func(ctx context.Context, a string) error { return nil }),
 			Entry("When arg is a int", "a 47", 47, func(ctx context.Context, a int) error { return nil }),
@@ -172,29 +139,28 @@ var _ = Describe("Hydrating a Step", func() {
 
 		DescribeTable("Applying a matching step definition with DocString or DataTable to a step",
 			func(arg interface{}, f interface{}) {
-				var step = &Step{
-					Text: "a blah",
-				}
 				if ds, ok := arg.(*DocString); ok {
 					step.DocString = ds
 				}
 				if dt, ok := arg.(*messages.DataTable); ok {
 					step.DataTable = dt
 				}
-				var stepDef = StepDefinition{
+				var stepDef = scheme.StepDefinition{
 					Expression: regexp.MustCompile("a (.*)"),
 					Function:   f,
 				}
-				scheme := Scheme{}
-				Expect(scheme.Register(stepDef)).Should(Succeed())
-				Expect(scheme.StepDefFor(step)).Should(Succeed())
-				Expect(step.Func).Should(Equal(reflect.ValueOf(f)))
-				Expect(step.Args).Should(HaveLen(2))
-				Expect(step.Args[1].Interface()).Should(Equal(arg))
+				s := scheme.Scheme{}
+				Expect(s.AddToScheme(stepDef)).Should(Succeed())
+
+				stepFunc, stepArgs, err := s.StepDefFor("a blah")
+				Expect(err).ShouldNot(HaveOccurred())
+				Expect(stepFunc).Should(Equal(reflect.ValueOf(f)))
+				Expect(stepArgs).Should(HaveLen(2))
+				Expect(stepArgs[1].Interface()).Should(Equal(arg))
 			},
 			Entry("When DocString",
 				&DocString{&messages.DocString{Content: "helloworld"}},
-				func(ctx context.Context, s string, doc *DocString) error { return nil },
+				func(ctx context.Context, s string, doc *parameters.DocString) error { return nil },
 			),
 			Entry("When DataTable",
 				&messages.DataTable{},
@@ -203,7 +169,7 @@ var _ = Describe("Hydrating a Step", func() {
 		)
 
 		It("should not apply for an invalid type", func() {
-			var stepDef = StepDefinition{
+			var stepDef = scheme.StepDefinition{
 				Expression: regexp.MustCompile("a (.*)"),
 				Function:   func(ctx context.Context, m map[string]string) error { return nil },
 			}
@@ -213,7 +179,7 @@ var _ = Describe("Hydrating a Step", func() {
 	})
 })
 
-func TestModels(t *testing.T) {
+func TestScheme(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Models Suite")
+	RunSpecs(t, "Scheme Suite")
 }

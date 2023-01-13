@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/testernetes/bdk/models"
+	"github.com/testernetes/bdk/scheme"
 )
 
 var stepHelpTemplate = `{{.Long}}
@@ -31,7 +31,7 @@ func NewStepsCommand() *cobra.Command {
 		Short: "View steps",
 		Long:  "",
 	}
-	for _, s := range models.Scheme.GetStepDefs() {
+	for _, s := range scheme.Default.GetStepDefs() {
 		step := &cobra.Command{
 			Use:     s.Name,
 			Short:   s.Text,
@@ -49,7 +49,7 @@ func NewStepsCommand() *cobra.Command {
 
 func printParameters(stepName string) string {
 	buf := bytes.NewBufferString("")
-	for _, s := range models.Scheme.GetStepDefs() {
+	for _, s := range scheme.Default.GetStepDefs() {
 		if s.Name == stepName {
 			for _, p := range s.Parameters {
 				text := p.Text

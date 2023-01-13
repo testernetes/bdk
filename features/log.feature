@@ -18,3 +18,8 @@ Feature: Logging
     """
     When I create pod
     Then within 1m pod logs should say Usage of /bdk:
+      | dfdfdfd | sdsdfsd |
+    # sdfsdfsdfsdf
+    # sfsdfsdfsdf
+    # sdfsdfsdfsd
+    # fsdfsdfsdf

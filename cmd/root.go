@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var formatter string
 var plugins []string
 
 // rootCmd represents the base command when called without any subcommands
@@ -19,10 +18,10 @@ var rootCmd = &cobra.Command{
 
 func NewRootCommand() *cobra.Command {
 	rootCmd.PersistentFlags().StringSliceVarP(&plugins, "plugins", "p", []string{}, "Additional plugin step definitions")
-	testCmd.Flags().StringVarP(&formatter, "format", "f", "simple", "the format printer")
 
-	rootCmd.AddCommand(testCmd)
+	rootCmd.AddCommand(NewTestCommand())
 	rootCmd.AddCommand(NewStepsCommand())
+	rootCmd.AddCommand(NewMatchersCommand())
 
 	return rootCmd
 }

@@ -2,9 +2,9 @@ package formatters
 
 import (
 	"github.com/kr/pretty"
-	"github.com/testernetes/bdk/models"
+	"github.com/testernetes/bdk/model"
 )
 
-func Debug(feature *models.Feature) {
+func Debug(feature *model.Feature) {
 	pretty.Println(feature)
 }

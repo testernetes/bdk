@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
-	messages "github.com/cucumber/messages/go/v21"
+	"github.com/testernetes/bdk/arguments"
 	"github.com/testernetes/gkube"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,7 +33,7 @@ func MustGetClientFrom(ctx context.Context) gkube.KubernetesHelper {
 	panic(errors.New(fmt.Sprintf("expected a client found %T in ctx", v)))
 }
 
-func PodLogOptionsFrom(table *messages.DataTable) *corev1.PodLogOptions {
+func PodLogOptionsFrom(table *arguments.DataTable) *corev1.PodLogOptions {
 	opts := &corev1.PodLogOptions{}
 	if table == nil {
 		return opts
@@ -78,7 +78,7 @@ func PodLogOptionsFrom(table *messages.DataTable) *corev1.PodLogOptions {
 	return opts
 }
 
-func ProxyGetOptionsFrom(table *messages.DataTable) map[string]string {
+func ProxyGetOptionsFrom(table *arguments.DataTable) map[string]string {
 	params := make(map[string]string)
 	if table == nil {
 		return params
@@ -94,7 +94,7 @@ func ProxyGetOptionsFrom(table *messages.DataTable) map[string]string {
 	return params
 }
 
-func PatchOptionsFrom(o client.Object, table *messages.DataTable) []interface{} {
+func PatchOptionsFrom(o client.Object, table *arguments.DataTable) []interface{} {
 	opts := []interface{}{o}
 	if table == nil {
 		return opts
@@ -127,7 +127,7 @@ func PatchOptionsFrom(o client.Object, table *messages.DataTable) []interface{} 
 	return opts
 }
 
-func CreateOptionsFrom(o client.Object, table *messages.DataTable) []interface{} {
+func CreateOptionsFrom(o client.Object, table *arguments.DataTable) []interface{} {
 	opts := []interface{}{o}
 	if table == nil {
 		return opts
@@ -152,7 +152,7 @@ func CreateOptionsFrom(o client.Object, table *messages.DataTable) []interface{}
 	return opts
 }
 
-func DeleteOptionsFrom(o client.Object, table *messages.DataTable) []interface{} {
+func DeleteOptionsFrom(o client.Object, table *arguments.DataTable) []interface{} {
 	opts := []interface{}{o}
 	if table == nil {
 		return opts

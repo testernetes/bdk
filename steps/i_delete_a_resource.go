@@ -3,21 +3,19 @@ package steps
 import (
 	"context"
 
-	messages "github.com/cucumber/messages/go/v21"
 	. "github.com/onsi/gomega"
+	"github.com/testernetes/bdk/arguments"
 	"github.com/testernetes/bdk/client"
-	"github.com/testernetes/bdk/models"
+	"github.com/testernetes/bdk/parameters"
 	"github.com/testernetes/bdk/register"
+	"github.com/testernetes/bdk/scheme"
 )
 
 func init() {
-	err := models.Scheme.Register(IDeleteAResource)
-	if err != nil {
-		panic(err)
-	}
+	scheme.Default.MustAddToScheme(IDeleteAResource)
 }
 
-var IDeleteAResource = models.StepDefinition{
+var IDeleteAResource = scheme.StepDefinition{
 	Name: "i-delete",
 	Text: "I delete <reference>",
 	Help: "Deletes the referenced resource. Step will fail if the reference was not defined in a previous step.",
@@ -36,8 +34,8 @@ var IDeleteAResource = models.StepDefinition{
 	And I delete cm
 	  | grace period seconds | 30         |
 	  | propagation policy   | Foreground |`,
-	Parameters: []models.Parameter{models.Reference, models.DeleteOptions},
-	Function: func(ctx context.Context, ref string, options *messages.DataTable) error {
+	Parameters: []parameters.Parameter{parameters.Reference, parameters.DeleteOptions},
+	Function: func(ctx context.Context, ref string, options *arguments.DataTable) error {
 		u := register.Load(ctx, ref)
 		Expect(u).ShouldNot(BeNil(), ErrNoResource, ref)
 

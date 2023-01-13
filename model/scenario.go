@@ -1,4 +1,4 @@
-package models
+package model
 
 import (
 	"context"
@@ -6,7 +6,8 @@ import (
 	messages "github.com/cucumber/messages/go/v21"
 	"github.com/testernetes/bdk/client"
 	"github.com/testernetes/bdk/register"
-	"github.com/testernetes/bdk/sessions"
+	"github.com/testernetes/bdk/scheme"
+	"github.com/testernetes/bdk/session"
 )
 
 type Scenario struct {
@@ -20,7 +21,7 @@ type Scenario struct {
 	//Examples    []*Examples        `json:"examples"`
 }
 
-func NewScenario(bkg *messages.Background, scn *messages.Scenario, scheme *scheme) (*Scenario, error) {
+func NewScenario(bkg *messages.Background, scn *messages.Scenario, scheme *scheme.Scheme) (*Scenario, error) {
 	if bkg == nil {
 		bkg = &messages.Background{}
 	}
@@ -32,11 +33,11 @@ func NewScenario(bkg *messages.Background, scn *messages.Scenario, scheme *schem
 		Background: bkg,
 	}
 
-	bkgSteps, err := GenerateSteps(bkg.Steps, scheme)
+	bkgSteps, err := NewSteps(bkg.Steps, scheme)
 	if err != nil {
 		return s, err
 	}
-	scnSteps, err := GenerateSteps(scn.Steps, scheme)
+	scnSteps, err := NewSteps(scn.Steps, scheme)
 	if err != nil {
 		return s, err
 	}
@@ -52,7 +53,7 @@ func (s *Scenario) Run(ctx context.Context) {
 	// * Register
 	ctx = register.NewRegisterFor(ctx)
 	// * PodSessions
-	ctx = sessions.NewPodSessionsFor(ctx)
+	ctx = session.NewPodSessionsFor(ctx)
 	// * PortForwarders
 	// * out and errOut Writers
 	for _, step := range s.Steps {

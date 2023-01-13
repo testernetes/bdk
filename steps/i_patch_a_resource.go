@@ -3,21 +3,19 @@ package steps
 import (
 	"context"
 
-	messages "github.com/cucumber/messages/go/v21"
 	. "github.com/onsi/gomega"
+	"github.com/testernetes/bdk/arguments"
 	"github.com/testernetes/bdk/client"
-	"github.com/testernetes/bdk/models"
+	"github.com/testernetes/bdk/parameters"
 	"github.com/testernetes/bdk/register"
+	"github.com/testernetes/bdk/scheme"
 )
 
 func init() {
-	err := models.Scheme.Register(IPatchAResource)
-	if err != nil {
-		panic(err)
-	}
+	scheme.Default.MustAddToScheme(IPatchAResource)
 }
 
-var IPatchAResource = models.StepDefinition{
+var IPatchAResource = scheme.StepDefinition{
 	Name: "i-patch",
 	Text: "I patch <reference>",
 	Help: `Patches the referenced resource. Step will fail if the reference was not defined in a previous step.`,
@@ -36,8 +34,8 @@ var IPatchAResource = models.StepDefinition{
 	When I patch cm
 	  | patch | {"data":{"foo":"nobar"}} |
 	Then for at least 10s cm jsonpath '{.data.foo}' should equal nobar`,
-	Parameters: []models.Parameter{models.Reference, models.PatchOptions},
-	Function: func(ctx context.Context, ref string, options *messages.DataTable) (err error) {
+	Parameters: []parameters.Parameter{parameters.Reference, parameters.PatchOptions},
+	Function: func(ctx context.Context, ref string, options *arguments.DataTable) (err error) {
 		u := register.Load(ctx, ref)
 		Expect(u).ShouldNot(BeNil(), ErrNoResource, ref)
 

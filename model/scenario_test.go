@@ -1,20 +1,33 @@
-package models
+package model
 
 import (
 	"context"
+	"fmt"
+	"regexp"
 
 	messages "github.com/cucumber/messages/go/v21"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/testernetes/bdk/scheme"
 )
 
 var _ = Describe("Running Scenarios", func() {
 
+	var basicGoodStep = scheme.StepDefinition{
+		Expression: regexp.MustCompile("a (.*)"),
+		Function: func(ctx context.Context, s string) error {
+			if len(s) > 1 {
+				return nil
+			}
+			return fmt.Errorf("small string")
+		},
+	}
+
 	Context("Running Basic Scenarios", Ordered, func() {
-		scheme := &Scheme{}
+		scheme := &scheme.Scheme{}
 
 		BeforeAll(func() {
-			Expect(scheme.Register(basicGoodStep)).Should(Succeed())
+			Expect(func() { scheme.AddToScheme(basicGoodStep) }).ShouldNot(Panic())
 		})
 
 		It("should run a basic good step", func() {

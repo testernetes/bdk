@@ -1,4 +1,4 @@
-package models
+package model
 
 import (
 	"context"
@@ -7,42 +7,14 @@ import (
 	"os"
 	"os/signal"
 	"reflect"
+	"runtime/debug"
 	"strings"
 	"time"
 
 	messages "github.com/cucumber/messages/go/v21"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/yaml"
+	"github.com/testernetes/bdk/arguments"
+	"github.com/testernetes/bdk/scheme"
 )
-
-var (
-	ErrNoAPIVersion = errors.New("Provided test case resource has an empty API Version")
-	ErrNoKind       = errors.New("Provided test case resource has an empty Kind")
-	ErrNoName       = errors.New("Provided test case resource has an empty Name")
-)
-
-type DocString struct {
-	*messages.DocString
-}
-
-func (d *DocString) GetUnstructured() (*unstructured.Unstructured, error) {
-	u := &unstructured.Unstructured{}
-	err := yaml.Unmarshal([]byte(d.DocString.Content), u)
-	if err != nil {
-		return u, err
-	}
-
-	if u.GetAPIVersion() == "" {
-		return u, ErrNoAPIVersion
-	}
-	if u.GetKind() == "" {
-		return u, ErrNoKind
-	}
-	if u.GetName() == "" {
-		return u, ErrNoName
-	}
-	return u, nil
-}
 
 type Step struct {
 	// Should these if templated by hydrated? yes, (maybe not if inject from previous step?)
@@ -50,8 +22,8 @@ type Step struct {
 	Keyword     string                   `json:"keyword"`
 	KeywordType messages.StepKeywordType `json:"keywordType,omitempty"`
 	Text        string                   `json:"text"`
-	DocString   *DocString               `json:"docString,omitempty"`
-	DataTable   *messages.DataTable      `json:"dataTable,omitempty"`
+	DocString   *arguments.DocString     `json:"docString,omitempty"`
+	DataTable   *arguments.DataTable     `json:"dataTable,omitempty"`
 
 	// Step Definition
 	Func reflect.Value   `json:"-"`
@@ -141,7 +113,8 @@ func (s *Step) Run(ctx context.Context) {
 				return
 			}
 			s.Execution.Result = Unknown
-			s.Execution.Message = fmt.Sprintf("step paniced in an unexpected way: %s", r)
+			s.Execution.Message = fmt.Sprintf("step panicked in an unexpected way: %s", r)
+			s.Execution.Err = errors.New(string(debug.Stack()))
 			return
 
 		}
@@ -170,20 +143,27 @@ func (s *Step) Run(ctx context.Context) {
 	ret = s.Func.Call(args)
 }
 
-func NewStep(stepDoc *messages.Step, scheme *scheme) (*Step, error) {
+func NewStep(stepDoc *messages.Step, scheme *scheme.Scheme) (*Step, error) {
 	s := &Step{
 		Location:    stepDoc.Location,
 		Keyword:     stepDoc.Keyword,
 		KeywordType: stepDoc.KeywordType,
 		Text:        stepDoc.Text,
-		DataTable:   stepDoc.DataTable,
 	}
 
+	var stepArgument arguments.Argument
 	if stepDoc.DocString != nil {
-		s.DocString = &DocString{stepDoc.DocString}
+		s.DocString = &arguments.DocString{stepDoc.DocString}
+		stepArgument = s.DocString
+	}
+	if stepDoc.DataTable != nil {
+		s.DataTable = &arguments.DataTable{stepDoc.DataTable}
+		stepArgument = s.DataTable
 	}
 
-	err := scheme.StepDefFor(s)
+	_ = stepArgument
+	var err error
+	s.Func, s.Args, err = scheme.StepDefFor(s.Text, s.DataTable, s.DocString)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +173,7 @@ func NewStep(stepDoc *messages.Step, scheme *scheme) (*Step, error) {
 	return s, nil
 }
 
-func GenerateSteps(stepDocs []*messages.Step, scheme *scheme) ([]*Step, error) {
+func NewSteps(stepDocs []*messages.Step, scheme *scheme.Scheme) ([]*Step, error) {
 	var steps []*Step
 	for _, stepDoc := range stepDocs {
 		step, err := NewStep(stepDoc, scheme)
