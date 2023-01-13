@@ -1,0 +1,66 @@
+/*
+Copyright © 2023 Matt Simons
+*/
+package cmd
+
+import (
+	"bytes"
+	"fmt"
+
+	"github.com/spf13/cobra"
+	"github.com/testernetes/bdk/models"
+)
+
+var stepHelpTemplate = `{{.Long}}
+
+Step Definitions:
+  {{.Short}}
+
+Parameters:
+  {{ parameters .Name }}
+
+Examples:
+{{.Example}}
+`
+
+func NewStepsCommand() *cobra.Command {
+	cobra.AddTemplateFunc("parameters", printParameters)
+
+	stepsCmd := &cobra.Command{
+		Use:   "steps",
+		Short: "View steps",
+		Long:  "",
+	}
+	for _, s := range models.Scheme.GetStepDefs() {
+		step := &cobra.Command{
+			Use:     s.Name,
+			Short:   s.Text,
+			Long:    s.Help,
+			Example: Examples(s.Examples),
+			Run: func(cmd *cobra.Command, args []string) {
+				cmd.Help()
+			},
+		}
+		step.SetHelpTemplate(stepHelpTemplate)
+		stepsCmd.AddCommand(step)
+	}
+	return stepsCmd
+}
+
+func printParameters(stepName string) string {
+	buf := bytes.NewBufferString("")
+	for _, s := range models.Scheme.GetStepDefs() {
+		if s.Name == stepName {
+			for _, p := range s.Parameters {
+				text := p.Text
+				if p.Text == "" {
+					text = "Additional Step Arguments"
+				}
+				fmt.Fprintf(buf, Examples("\n%s:"), text)
+				fmt.Fprintf(buf, Parameter(p.ShortHelp))
+				fmt.Fprintf(buf, Parameter(p.LongHelp))
+			}
+		}
+	}
+	return buf.String()
+}
