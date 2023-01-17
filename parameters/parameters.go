@@ -2,6 +2,10 @@ package parameters
 
 import (
 	"fmt"
+	"reflect"
+
+	"github.com/testernetes/bdk/arguments"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -39,6 +43,7 @@ type Parameter struct {
 	ShortHelp  string
 	LongHelp   string
 	Expression string
+	Converter  func(interface{}) (reflect.Value, error)
 }
 
 var CreateOptions = Parameter{
@@ -48,6 +53,32 @@ var CreateOptions = Parameter{
 		Create Options:
 		| dry run       | boolean |
 		| field manager | string  |`,
+	Converter: func(arg interface{}) (reflect.Value, error) {
+		opts := []client.CreateOption{}
+		table, ok := arg.(*arguments.DataTable)
+		if table == nil || !ok {
+			return reflect.ValueOf(opts), nil
+		}
+
+		for _, row := range table.Rows {
+			if len(row.Cells) < 2 {
+				continue
+			}
+			opt := row.Cells[0].Value
+			val := row.Cells[1].Value
+			switch opt {
+			case "dry run":
+				if val == "true" {
+					opts = append(opts, client.DryRunAll)
+				}
+			case "field owner":
+				opts = append(opts, client.FieldOwner(val))
+			default:
+				return reflect.Value{}, fmt.Errorf("invalid create option: %s", opt)
+			}
+		}
+		return reflect.ValueOf(opts), nil
+	},
 }
 
 var DeleteOptions = Parameter{

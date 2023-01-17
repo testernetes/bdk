@@ -106,20 +106,22 @@ func (s *Scheme) AddToScheme(sd StepDefinition) error {
 		case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8, reflect.String, reflect.Float64, reflect.Float32:
 			continue
 		case reflect.Ptr:
+			continue
 			switch param.Elem().String() {
 			case "arguments.DocString":
 				continue
 			case "arguments.DataTable":
 				continue
-			default:
-				return fmt.Errorf("%w: the argument %d type %s is not supported", ErrUnsupportedArgumentType, i, param.Elem().String())
+				//default:
+				//	return fmt.Errorf("%w: the argument %d type %s is not supported", ErrUnsupportedArgumentType, i, param.Elem().String())
 			}
 		case reflect.Slice:
 			switch param {
 			case reflect.TypeOf([]byte(nil)):
 				continue
 			default:
-				return fmt.Errorf("%w: argument %d type %s is not supported", ErrUnsupportedArgumentType, i, param.Kind())
+				//return fmt.Errorf("%w: argument %d type %s is not supported", ErrUnsupportedArgumentType, i, param.Kind())
+				continue
 			}
 		default:
 			return fmt.Errorf("%w: argument %d type %s is not supported", ErrUnsupportedArgumentType, i, param.Kind())
@@ -128,15 +130,19 @@ func (s *Scheme) AddToScheme(sd StepDefinition) error {
 
 	// if it has exactly one extra arg and it is a DocString or DataTable
 	if numIn-2 == inputs {
+		s.stepDefinitions = append(s.stepDefinitions, sd)
+		return nil
 		if arg := typ.In(numIn - 1); arg.Kind() == reflect.Ptr {
-			switch arg.Elem().String() {
-			case "arguments.DocString":
-				s.stepDefinitions = append(s.stepDefinitions, sd)
-				return nil
-			case "arguments.DataTable":
-				s.stepDefinitions = append(s.stepDefinitions, sd)
-				return nil
-			}
+			s.stepDefinitions = append(s.stepDefinitions, sd)
+			return nil
+			//switch arg.Elem().String() {
+			//case "arguments.DocString":
+			//	s.stepDefinitions = append(s.stepDefinitions, sd)
+			//	return nil
+			//case "arguments.DataTable":
+			//	s.stepDefinitions = append(s.stepDefinitions, sd)
+			//	return nil
+			//}
 		}
 		return ErrTooManyArguments
 	}
@@ -158,6 +164,7 @@ func (s *Scheme) StepDefFor(text string, dt *arguments.DataTable, ds *arguments.
 	var input []string
 	var fType reflect.Type
 
+	var stepDef StepDefinition
 	var stepFunc reflect.Value
 	var stepArgs []reflect.Value
 
@@ -175,16 +182,20 @@ func (s *Scheme) StepDefFor(text string, dt *arguments.DataTable, ds *arguments.
 
 		// Ignoring DocString or DataTable
 		if lastParam := fType.In(fArgCount - 1); lastParam.Kind() == reflect.Ptr {
-			if lastParam.Elem().String() == "arguments.DocString" {
-				fArgCount--
-			}
-			if lastParam.Elem().String() == "arguments.DataTable" {
-				fArgCount--
-			}
+			//if lastParam.Elem().String() == "arguments.DocString" {
+			//	fArgCount--
+			//}
+			//if lastParam.Elem().String() == "arguments.DataTable" {
+			//	fArgCount--
+			//}
+			fArgCount--
 		}
+		stepFunc = f
+		stepDef = sd
 
 		if matchedInputs == fArgCount {
 			stepFunc = f
+			stepDef = sd
 			//fmt.Printf("Found step def for: %s == %s\n", text, sd.Text)
 			break
 		}
@@ -249,13 +260,30 @@ func (s *Scheme) StepDefFor(text string, dt *arguments.DataTable, ds *arguments.
 			case "arguments.DataTable":
 				stepArgs = append(stepArgs, reflect.ValueOf(dt))
 			default:
+				if converter := stepDef.Parameters[i].Converter; converter != nil {
+					arg, err := converter(ds)
+					if err != nil {
+						panic("failed to convert")
+					}
+					stepArgs = append(stepArgs, reflect.ValueOf(arg))
+					continue
+				}
 				return stepFunc, stepArgs, fmt.Errorf("%w: the argument %d type %s is not supported", ErrUnsupportedArgumentType, i, param.Elem().String())
 			}
 		case reflect.Slice:
+			stepArgs = append(stepArgs, reflect.ValueOf([]byte(input[i])))
 			switch param {
 			case reflect.TypeOf([]byte(nil)):
 				stepArgs = append(stepArgs, reflect.ValueOf([]byte(input[i])))
 			default:
+				if converter := stepDef.Parameters[i].Converter; converter != nil {
+					arg, err := converter(ds)
+					if err != nil {
+						panic("failed to convert")
+					}
+					stepArgs = append(stepArgs, reflect.ValueOf(arg))
+					continue
+				}
 				return stepFunc, stepArgs, fmt.Errorf("%w: the slice argument %d type %s is not supported", ErrUnsupportedArgumentType, i, param.Kind())
 			}
 		default:

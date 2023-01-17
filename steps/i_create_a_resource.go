@@ -4,11 +4,11 @@ import (
 	"context"
 
 	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/arguments"
 	"github.com/testernetes/bdk/client"
 	"github.com/testernetes/bdk/parameters"
 	"github.com/testernetes/bdk/register"
 	"github.com/testernetes/bdk/scheme"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func init() {
@@ -34,11 +34,12 @@ var ICreateAResource = scheme.StepDefinition{
 	  | field manager | example |
 	Then within 1s cm jsonpath '{.metadata.uid}' should not be empty`,
 	Parameters: []parameters.Parameter{parameters.Reference, parameters.CreateOptions},
-	Function: func(ctx context.Context, ref string, options *arguments.DataTable) error {
+	Function: func(ctx context.Context, ref string, options []k8sclient.CreateOption) error {
 		u := register.Load(ctx, ref)
 		Expect(u).ShouldNot(BeNil(), ErrNoResource, ref)
 
-		opts := client.CreateOptionsFrom(u, options)
+		//opts := client.CreateOptionsFrom(u, options)
+		opts := append([]interface{}{u}, options)
 		c := client.MustGetClientFrom(ctx)
 		Eventually(c.Create).WithContext(ctx).WithArguments(opts...).Should(Succeed(), "Failed to create resource")
 
