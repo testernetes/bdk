@@ -1,4 +1,4 @@
-package register
+package contextutils
 
 import (
 	"context"
@@ -17,14 +17,14 @@ func NewRegisterFor(ctx context.Context) context.Context {
 	return rctx
 }
 
-func Save(ctx context.Context, key string, value *unstructured.Unstructured) {
+func SaveObject(ctx context.Context, key string, value *unstructured.Unstructured) {
 	v := ctx.Value(&register{})
 	if objRegister, ok := v.(map[string]*unstructured.Unstructured); ok {
 		objRegister[key] = value
 	}
 }
 
-func Load(ctx context.Context, key string) *unstructured.Unstructured {
+func LoadObject(ctx context.Context, key string) *unstructured.Unstructured {
 	v := ctx.Value(&register{})
 	if objRegister, ok := v.(map[string]*unstructured.Unstructured); ok {
 		return objRegister[key]
@@ -33,7 +33,7 @@ func Load(ctx context.Context, key string) *unstructured.Unstructured {
 }
 
 func LoadPod(ctx context.Context, key string) *corev1.Pod {
-	u := Load(ctx, key)
+	u := LoadObject(ctx, key)
 	if u == nil {
 		return nil
 	}

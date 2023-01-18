@@ -4,10 +4,8 @@ import (
 	"context"
 
 	messages "github.com/cucumber/messages/go/v21"
-	"github.com/testernetes/bdk/client"
-	"github.com/testernetes/bdk/register"
+	"github.com/testernetes/bdk/contextutils"
 	"github.com/testernetes/bdk/scheme"
-	"github.com/testernetes/bdk/session"
 )
 
 type Scenario struct {
@@ -49,11 +47,11 @@ func NewScenario(bkg *messages.Background, scn *messages.Scenario, scheme *schem
 func (s *Scenario) Run(ctx context.Context) {
 	// add to ctx
 	// * Helper
-	ctx = client.NewClientFor(ctx)
+	ctx = contextutils.NewClientFor(ctx)
 	// * Register
-	ctx = register.NewRegisterFor(ctx)
+	ctx = contextutils.NewRegisterFor(ctx)
 	// * PodSessions
-	ctx = session.NewPodSessionsFor(ctx)
+	ctx = contextutils.NewPodSessionsFor(ctx)
 	// * PortForwarders
 	// * out and errOut Writers
 	for _, step := range s.Steps {

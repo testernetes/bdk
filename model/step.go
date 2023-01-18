@@ -16,6 +16,13 @@ import (
 	"github.com/testernetes/bdk/scheme"
 )
 
+//        Unspecified,
+//        Context,
+//        Action,
+//        Outcome,
+//        Conjunction,
+//        Unknown
+
 type Step struct {
 	// Should these if templated by hydrated? yes, (maybe not if inject from previous step?)
 	Location    *messages.Location       `json:"location"`

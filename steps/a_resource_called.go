@@ -3,11 +3,10 @@ package steps
 import (
 	"context"
 
-	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/arguments"
+	"github.com/testernetes/bdk/contextutils"
 	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/register"
 	"github.com/testernetes/bdk/scheme"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func init() {
@@ -31,11 +30,8 @@ in future steps in the same scenario. JSON and YAML formats are accepted.`,
 	    foo: bar
 	  """`,
 	Parameters: []parameters.Parameter{parameters.Reference, parameters.Manifest},
-	Function: func(ctx context.Context, ref string, manifest *arguments.DocString) (err error) {
-		u, err := manifest.GetUnstructured()
-		Expect(err).ShouldNot(HaveOccurred())
-
-		register.Save(ctx, ref, u)
+	Function: func(ctx context.Context, ref string, manifest *unstructured.Unstructured) (err error) {
+		contextutils.SaveObject(ctx, ref, manifest)
 
 		return nil
 	},

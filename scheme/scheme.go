@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/testernetes/bdk/arguments"
@@ -124,27 +123,26 @@ func (s *Scheme) AddToScheme(sd StepDefinition) error {
 				continue
 			}
 		default:
-			return fmt.Errorf("%w: argument %d type %s is not supported", ErrUnsupportedArgumentType, i, param.Kind())
+			//return fmt.Errorf("%w: argument %d type %s is not supported", ErrUnsupportedArgumentType, i, param.Kind())
 		}
 	}
 
 	// if it has exactly one extra arg and it is a DocString or DataTable
 	if numIn-2 == inputs {
+		//fmt.Printf("%s\n", typ.In(numIn-1).Kind().String())
 		s.stepDefinitions = append(s.stepDefinitions, sd)
 		return nil
-		if arg := typ.In(numIn - 1); arg.Kind() == reflect.Ptr {
-			s.stepDefinitions = append(s.stepDefinitions, sd)
-			return nil
-			//switch arg.Elem().String() {
-			//case "arguments.DocString":
-			//	s.stepDefinitions = append(s.stepDefinitions, sd)
-			//	return nil
-			//case "arguments.DataTable":
-			//	s.stepDefinitions = append(s.stepDefinitions, sd)
-			//	return nil
-			//}
-		}
-		return ErrTooManyArguments
+		//if arg := typ.In(numIn - 1); arg.Kind() == reflect.Ptr {
+		//	switch arg.Elem().String() {
+		//	case "arguments.DocString":
+		//		s.stepDefinitions = append(s.stepDefinitions, sd)
+		//		return nil
+		//	case "arguments.DataTable":
+		//		s.stepDefinitions = append(s.stepDefinitions, sd)
+		//		return nil
+		//	}
+		//}
+		//return ErrTooManyArguments
 	}
 
 	if numIn-1 > inputs {
@@ -161,133 +159,73 @@ func (s *Scheme) AddToScheme(sd StepDefinition) error {
 
 // TODO change dt and ds to a single interface which converts to other objects
 func (s *Scheme) StepDefFor(text string, dt *arguments.DataTable, ds *arguments.DocString) (reflect.Value, []reflect.Value, error) {
-	var input []string
-	var fType reflect.Type
-
+	var groups []string
 	var stepDef StepDefinition
-	var stepFunc reflect.Value
-	var stepArgs []reflect.Value
+	var additionalStepArg int
 
 	for _, sd := range s.stepDefinitions {
+		additionalStepArg = 0
 		if !sd.GetExpression().MatchString(text) {
 			continue
 		}
 
-		input = sd.GetExpression().FindStringSubmatch(text)
-		matchedInputs := len(input)
+		// Get all capture groups
+		groups = sd.GetExpression().FindStringSubmatch(text)
 
-		f := reflect.ValueOf(sd.Function)
-		fType = f.Type()
-		fArgCount := fType.NumIn() // Ignoring context
-
-		// Ignoring DocString or DataTable
-		if lastParam := fType.In(fArgCount - 1); lastParam.Kind() == reflect.Ptr {
-			//if lastParam.Elem().String() == "arguments.DocString" {
-			//	fArgCount--
-			//}
-			//if lastParam.Elem().String() == "arguments.DataTable" {
-			//	fArgCount--
-			//}
-			fArgCount--
+		// Check if there is an additional step argument
+		if len(groups) == reflect.ValueOf(sd.Function).Type().NumIn()-1 {
+			if sd.Parameters[len(sd.Parameters)-1].ParseDocString != nil {
+				additionalStepArg = 1
+			}
+			if sd.Parameters[len(sd.Parameters)-1].ParseDataTable != nil {
+				additionalStepArg = 1
+			}
 		}
-		stepFunc = f
+
+		// the number of step capture groups (and additional step argument)
+		// must match exactly the same number of parameters
+		if len(groups)-1+additionalStepArg != len(sd.Parameters) {
+			continue
+		}
+
 		stepDef = sd
+		//fmt.Printf("Found step def for: %s == %s\n", text, sd.Text)
+		break
+	}
+	if stepDef.Function == nil {
+		return reflect.Value{}, []reflect.Value{}, errors.New(fmt.Sprintf("cannot find step definition for %s: %s", text, ErrNoStepDefFound))
+	}
 
-		if matchedInputs == fArgCount {
-			stepFunc = f
-			stepDef = sd
-			//fmt.Printf("Found step def for: %s == %s\n", text, sd.Text)
-			break
+	stepFunc := reflect.ValueOf(stepDef.Function)
+	var stepArgs []reflect.Value
+
+	// Parse regexp cature groups
+	for i := 1; i < len(groups); i++ {
+		targetType := stepFunc.Type().In(i)
+		arg, err := stepDef.Parameters[i-1].ParseString(groups[i], targetType)
+		if err != nil {
+			return reflect.Value{}, []reflect.Value{}, fmt.Errorf("cannot parse parameter %s: %w", stepDef.Parameters[i-1].Text, err)
 		}
-	}
-	if !stepFunc.IsValid() {
-		return stepFunc, stepArgs, errors.New(fmt.Sprintf("Can not find step definition for %s: %s", text, ErrNoStepDefFound))
+		stepArgs = append(stepArgs, arg)
 	}
 
-	// Build stepArgs from matched regexp values converting to their required type and storing as a reflect.Value
-	// Ingoring first parameter context
-	for i := 1; i < fType.NumIn(); i++ {
-		param := fType.In(i)
-		switch param.Kind() {
-		case reflect.Int:
-			v, err := strconv.ParseInt(input[i], 10, 0)
+	// Parse step argument if one exists
+	if additionalStepArg == 1 {
+		lastParam := len(stepDef.Parameters) - 1
+		targetType := stepFunc.Type().In(lastParam + 1)
+		if stepDef.Parameters[lastParam].ParseDocString != nil {
+			arg, err := stepDef.Parameters[lastParam].ParseDocString(ds, targetType)
 			if err != nil {
-				return stepFunc, stepArgs, fmt.Errorf(`%w %d: "%s" to int: %s`, ErrCannotConvert, i, input[i], err)
+				return reflect.Value{}, []reflect.Value{}, fmt.Errorf("cannot parse parameter %s: %w", stepDef.Parameters[lastParam].Text, err)
 			}
-			stepArgs = append(stepArgs, reflect.ValueOf(int(v)))
-		case reflect.Int64:
-			v, err := strconv.ParseInt(input[i], 10, 64)
+			stepArgs = append(stepArgs, arg)
+		}
+		if stepDef.Parameters[lastParam].ParseDataTable != nil {
+			arg, err := stepDef.Parameters[lastParam].ParseDataTable(dt, targetType)
 			if err != nil {
-				return stepFunc, stepArgs, fmt.Errorf(`%w %d: "%s" to int64: %s`, ErrCannotConvert, i, input[i], err)
+				return reflect.Value{}, []reflect.Value{}, fmt.Errorf("cannot parse parameter %s: %w", stepDef.Parameters[lastParam].Text, err)
 			}
-			stepArgs = append(stepArgs, reflect.ValueOf(v))
-		case reflect.Int32:
-			v, err := strconv.ParseInt(input[i], 10, 32)
-			if err != nil {
-				return stepFunc, stepArgs, fmt.Errorf(`%w %d: "%s" to int32: %s`, ErrCannotConvert, i, input[i], err)
-			}
-			stepArgs = append(stepArgs, reflect.ValueOf(int32(v)))
-		case reflect.Int16:
-			v, err := strconv.ParseInt(input[i], 10, 16)
-			if err != nil {
-				return stepFunc, stepArgs, fmt.Errorf(`%w %d: "%s" to int16: %s`, ErrCannotConvert, i, input[i], err)
-			}
-			stepArgs = append(stepArgs, reflect.ValueOf(int16(v)))
-		case reflect.Int8:
-			v, err := strconv.ParseInt(input[i], 10, 8)
-			if err != nil {
-				return stepFunc, stepArgs, fmt.Errorf(`%w %d: "%s" to int8: %s`, ErrCannotConvert, i, input[i], err)
-			}
-			stepArgs = append(stepArgs, reflect.ValueOf(int8(v)))
-		case reflect.String:
-			stepArgs = append(stepArgs, reflect.ValueOf(input[i]))
-		case reflect.Float64:
-			v, err := strconv.ParseFloat(input[i], 64)
-			if err != nil {
-				return stepFunc, stepArgs, fmt.Errorf(`%w %d: "%s" to float64: %s`, ErrCannotConvert, i, input[i], err)
-			}
-			stepArgs = append(stepArgs, reflect.ValueOf(v))
-		case reflect.Float32:
-			v, err := strconv.ParseFloat(input[i], 32)
-			if err != nil {
-				return stepFunc, stepArgs, fmt.Errorf(`%w %d: "%s" to float32: %s`, ErrCannotConvert, i, input[i], err)
-			}
-			stepArgs = append(stepArgs, reflect.ValueOf(float32(v)))
-		case reflect.Ptr:
-			switch param.Elem().String() {
-			case "arguments.DocString":
-				stepArgs = append(stepArgs, reflect.ValueOf(ds))
-			case "arguments.DataTable":
-				stepArgs = append(stepArgs, reflect.ValueOf(dt))
-			default:
-				if converter := stepDef.Parameters[i].Converter; converter != nil {
-					arg, err := converter(ds)
-					if err != nil {
-						panic("failed to convert")
-					}
-					stepArgs = append(stepArgs, reflect.ValueOf(arg))
-					continue
-				}
-				return stepFunc, stepArgs, fmt.Errorf("%w: the argument %d type %s is not supported", ErrUnsupportedArgumentType, i, param.Elem().String())
-			}
-		case reflect.Slice:
-			stepArgs = append(stepArgs, reflect.ValueOf([]byte(input[i])))
-			switch param {
-			case reflect.TypeOf([]byte(nil)):
-				stepArgs = append(stepArgs, reflect.ValueOf([]byte(input[i])))
-			default:
-				if converter := stepDef.Parameters[i].Converter; converter != nil {
-					arg, err := converter(ds)
-					if err != nil {
-						panic("failed to convert")
-					}
-					stepArgs = append(stepArgs, reflect.ValueOf(arg))
-					continue
-				}
-				return stepFunc, stepArgs, fmt.Errorf("%w: the slice argument %d type %s is not supported", ErrUnsupportedArgumentType, i, param.Kind())
-			}
-		default:
-			return stepFunc, stepArgs, fmt.Errorf("%w: the argument %d type %s is not supported", ErrUnsupportedArgumentType, i, param.Kind())
+			stepArgs = append(stepArgs, arg)
 		}
 	}
 

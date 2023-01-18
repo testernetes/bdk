@@ -7,26 +7,24 @@ import (
 	"time"
 
 	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/arguments"
-	"github.com/testernetes/bdk/client"
+	"github.com/testernetes/bdk/contextutils"
 	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/register"
 	"github.com/testernetes/bdk/scheme"
 	"github.com/testernetes/gkube"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	ctrlclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func init() {
 	scheme.Default.MustAddToScheme(IProxyGet)
 }
 
-var IProxyGetFunc = func(ctx context.Context, scheme, ref, port, path string, options *arguments.DataTable) error {
-	u := register.Load(ctx, ref)
+var IProxyGetFunc = func(ctx context.Context, scheme, ref, port, path string, params map[string]string) error {
+	u := contextutils.LoadObject(ctx, ref)
 	Expect(u).ShouldNot(BeNil(), ErrNoResource, ref)
 
-	var o ctrlclient.Object
+	var o client.Object
 	switch u.GetObjectKind().GroupVersionKind().Kind {
 	case "Pod":
 		pod := &corev1.Pod{}
@@ -43,10 +41,9 @@ var IProxyGetFunc = func(ctx context.Context, scheme, ref, port, path string, op
 		}
 		o = service
 	}
-	params := client.ProxyGetOptionsFrom(options)
 
 	var s *gkube.PodSession
-	c := client.MustGetClientFrom(ctx)
+	c := contextutils.MustGetClientFrom(ctx)
 	Eventually(func() error {
 		var err error
 		s, err = c.ProxyGet(ctx, o, scheme, port, path, params, nil, nil)
@@ -88,7 +85,7 @@ var IProxyGet = scheme.StepDefinition{
 
 var IProxyGetHTTP = scheme.StepDefinition{
 	Expression: regexp.MustCompile(fmt.Sprintf(`^I proxy get %s%s%s$`, NamedObj, Port, URLPath)),
-	Function: func(ctx context.Context, ref, port, path string, options *arguments.DataTable) error {
+	Function: func(ctx context.Context, ref, port, path string, options map[string]string) error {
 		return IProxyGetFunc(ctx, "", ref, port, path, options)
 	},
 	Name: "i-proxy-get",

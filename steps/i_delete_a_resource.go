@@ -4,11 +4,10 @@ import (
 	"context"
 
 	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/arguments"
-	"github.com/testernetes/bdk/client"
+	"github.com/testernetes/bdk/contextutils"
 	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/register"
 	"github.com/testernetes/bdk/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func init() {
@@ -35,13 +34,13 @@ var IDeleteAResource = scheme.StepDefinition{
 	  | grace period seconds | 30         |
 	  | propagation policy   | Foreground |`,
 	Parameters: []parameters.Parameter{parameters.Reference, parameters.DeleteOptions},
-	Function: func(ctx context.Context, ref string, options *arguments.DataTable) error {
-		u := register.Load(ctx, ref)
-		Expect(u).ShouldNot(BeNil(), ErrNoResource, ref)
+	Function: func(ctx context.Context, ref string, opts []client.DeleteOption) error {
+		o := contextutils.LoadObject(ctx, ref)
+		Expect(o).ShouldNot(BeNil(), ErrNoResource, ref)
 
-		opts := client.DeleteOptionsFrom(u, options)
-		c := client.MustGetClientFrom(ctx)
-		Eventually(c.Delete).WithContext(ctx).WithArguments(opts...).Should(Succeed(), "Failed to delete resource")
+		args := append([]interface{}{o}, opts)
+		c := contextutils.MustGetClientFrom(ctx)
+		Eventually(c.Delete).WithContext(ctx).WithArguments(args...).Should(Succeed(), "Failed to delete resource")
 
 		return nil
 	},
