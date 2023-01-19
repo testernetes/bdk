@@ -5,9 +5,8 @@ import (
 	"fmt"
 
 	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/client"
+	"github.com/testernetes/bdk/contextutils"
 	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/register"
 	"github.com/testernetes/bdk/scheme"
 )
 
@@ -17,16 +16,16 @@ func init() {
 }
 
 var AsyncAssertFunc = func(ctx context.Context, phrase, timeout, ref, jsonpath, not, matcher string) (err error) {
-	u := register.Load(ctx, ref)
-	Expect(u).ShouldNot(BeNil(), ErrNoResource, ref)
+	o := contextutils.LoadObject(ctx, ref)
+	Expect(o).ShouldNot(BeNil(), ErrNoResource, ref)
 
 	// nest the jsonpath transformer with the matcher
 	matcher = fmt.Sprintf("jsonpath '%s' %s", jsonpath, matcher)
 
-	c := client.MustGetClientFrom(ctx)
+	c := contextutils.MustGetClientFrom(ctx)
 	NewStringAsyncAssertion(phrase, c.Object).
 		WithContext(ctx, timeout).
-		WithArguments(u).
+		WithArguments(o).
 		ShouldOrShouldNot(not, matcher)
 
 	return nil

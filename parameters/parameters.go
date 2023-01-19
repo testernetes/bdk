@@ -1,7 +1,17 @@
 package parameters
 
 import (
+	"errors"
 	"fmt"
+	"reflect"
+	"strconv"
+
+	"github.com/testernetes/bdk/arguments"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -27,18 +37,14 @@ var (
 	ConsistentlyPhrases = []string{"for at least", "for no less than"}
 )
 
-//        Unspecified,
-//        Context,
-//        Action,
-//        Outcome,
-//        Conjunction,
-//        Unknown
-
 type Parameter struct {
-	Text       string
-	ShortHelp  string
-	LongHelp   string
-	Expression string
+	Text           string
+	ShortHelp      string
+	LongHelp       string
+	Expression     string
+	ParseDataTable func(*arguments.DataTable, reflect.Type) (reflect.Value, error)
+	ParseDocString func(*arguments.DocString, reflect.Type) (reflect.Value, error)
+	ParseString    func(string, reflect.Type) (reflect.Value, error)
 }
 
 var CreateOptions = Parameter{
@@ -48,6 +54,31 @@ var CreateOptions = Parameter{
 		Create Options:
 		| dry run       | boolean |
 		| field manager | string  |`,
+	ParseDataTable: func(table *arguments.DataTable, targetType reflect.Type) (reflect.Value, error) {
+		opts := []client.CreateOption{}
+		if table == nil {
+			return reflect.ValueOf(opts), nil
+		}
+
+		for _, row := range table.Rows {
+			if len(row.Cells) < 2 {
+				continue
+			}
+			opt := row.Cells[0].Value
+			val := row.Cells[1].Value
+			switch opt {
+			case "dry run":
+				if val == "true" {
+					opts = append(opts, client.DryRunAll)
+				}
+			case "field owner":
+				opts = append(opts, client.FieldOwner(val))
+			default:
+				return reflect.Value{}, fmt.Errorf("invalid create option: %s", opt)
+			}
+		}
+		return reflect.ValueOf(opts), nil
+	},
 }
 
 var DeleteOptions = Parameter{
@@ -58,6 +89,38 @@ var DeleteOptions = Parameter{
 		| dry run              | boolean                        |
 		| grace period seconds | number                         |
 		| propagation policy   | (Orphan|Background|Foreground) |`,
+	ParseDataTable: func(table *arguments.DataTable, targetType reflect.Type) (reflect.Value, error) {
+		opts := []client.DeleteOption{}
+		if table == nil {
+			return reflect.ValueOf(opts), nil
+		}
+		for _, row := range table.Rows {
+			if len(row.Cells) < 2 {
+				continue
+			}
+			opt := row.Cells[0].Value
+			val := row.Cells[1].Value
+			switch opt {
+			case "dry run":
+				if val == "true" {
+					opts = append(opts, client.DryRunAll)
+				}
+			case "grace period seconds":
+				v, err := strconv.ParseInt(val, 10, 64)
+				if err != nil {
+					panic(err)
+				}
+				opts = append(opts, client.GracePeriodSeconds(v))
+			case "preconditions":
+				panic("preconditions not yet supported")
+			case "propagation policy":
+				opts = append(opts, client.PropagationPolicy(val))
+			default:
+				panic(fmt.Sprintf("invalid delete option %s", opt))
+			}
+		}
+		return reflect.ValueOf(opts), nil
+	},
 }
 
 var PatchOptions = Parameter{
@@ -69,6 +132,38 @@ var PatchOptions = Parameter{
 		| force         | boolean           |
 		| dry run       | boolean           |
 		| field manager | string            |`,
+	ParseDataTable: func(table *arguments.DataTable, targetType reflect.Type) (reflect.Value, error) {
+		opts := []interface{}{}
+		if table == nil {
+			return reflect.ValueOf(opts), nil
+		}
+		for _, row := range table.Rows {
+			if len(row.Cells) < 2 {
+				continue
+			}
+			opt := row.Cells[0].Value
+			val := row.Cells[1].Value
+			switch opt {
+			case "dry run":
+				if val == "true" {
+					opts = append(opts, client.DryRunAll)
+				}
+			case "field owner":
+				opts = append(opts, client.FieldOwner(val))
+			case "force":
+				if val == "true" {
+					opts = append(opts, client.ForceOwnership)
+				}
+			case "patch":
+				patch, err := yaml.YAMLToJSON([]byte(val))
+				if err != nil {
+					panic(err)
+				}
+				opts = append(opts, client.RawPatch(types.StrategicMergePatchType, patch))
+			}
+		}
+		return reflect.ValueOf(opts), nil
+	},
 }
 
 var PodLogOptions = Parameter{
@@ -83,6 +178,50 @@ var PodLogOptions = Parameter{
 		| timestamps    | boolean |
 		| tail lines    | number  |
 		| limit bytes   | number  |`,
+	ParseDataTable: func(table *arguments.DataTable, targetType reflect.Type) (reflect.Value, error) {
+		opts := &corev1.PodLogOptions{}
+		if table == nil {
+			return reflect.ValueOf(opts), nil
+		}
+		for _, row := range table.Rows {
+			if len(row.Cells) < 2 {
+				continue
+			}
+			opt := row.Cells[0].Value
+			val := row.Cells[1].Value
+			switch opt {
+			case "container":
+				opts.Container = val
+			case "follow":
+				opts.Follow = val == "true"
+			case "previous":
+				opts.Previous = val == "true"
+			case "since seconds":
+				v, err := strconv.ParseInt(val, 10, 64)
+				if err != nil {
+					panic(err)
+				}
+				opts.SinceSeconds = &v
+			case "since time":
+				panic("since time not yet implemented")
+			case "timestamps":
+				opts.Timestamps = val == "true"
+			case "tail lines":
+				v, err := strconv.ParseInt(val, 10, 64)
+				if err != nil {
+					panic(err)
+				}
+				opts.TailLines = &v
+			case "limit bytes":
+				v, err := strconv.ParseInt(val, 10, 64)
+				if err != nil {
+					panic(err)
+				}
+				opts.LimitBytes = &v
+			}
+		}
+		return reflect.ValueOf(opts), nil
+	},
 }
 
 var ProxyGetOptions = Parameter{
@@ -91,6 +230,21 @@ var ProxyGetOptions = Parameter{
 
 		ProxyGet Options:
 		| string | string |`,
+	ParseDataTable: func(table *arguments.DataTable, targetType reflect.Type) (reflect.Value, error) {
+		params := make(map[string]string)
+		if table == nil {
+			return reflect.ValueOf(params), nil
+		}
+		for _, row := range table.Rows {
+			if len(row.Cells) < 2 {
+				continue
+			}
+			opt := row.Cells[0].Value
+			val := row.Cells[1].Value
+			params[opt] = val
+		}
+		return reflect.ValueOf(params), nil
+	},
 }
 
 var Manifest = Parameter{
@@ -98,17 +252,43 @@ var Manifest = Parameter{
 	LongHelp: `https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects/
 
 		Can be yaml or json depending on the content type.`,
+	ParseDocString: func(docString *arguments.DocString, targetType reflect.Type) (reflect.Value, error) {
+		u := &unstructured.Unstructured{}
+		err := yaml.Unmarshal([]byte(docString.Content), u)
+		if err != nil {
+			return reflect.ValueOf(u), err
+		}
+
+		var (
+			ErrNoAPIVersion = errors.New("Provided test case resource has an empty API Version")
+			ErrNoKind       = errors.New("Provided test case resource has an empty Kind")
+			ErrNoName       = errors.New("Provided test case resource has an empty Name")
+		)
+
+		if u.GetAPIVersion() == "" {
+			return reflect.ValueOf(u), ErrNoAPIVersion
+		}
+		if u.GetKind() == "" {
+			return reflect.ValueOf(u), ErrNoKind
+		}
+		if u.GetName() == "" {
+			return reflect.ValueOf(u), ErrNoName
+		}
+		return reflect.ValueOf(u), nil
+	},
 }
 
 var Script = Parameter{
 	ShortHelp: `A script.`,
 	LongHelp: `The script will run in the specified shell or if none is specified /bin/sh.
 		Its outputs will be captured and can be asserted against in future steps.`,
+	ParseDocString: DocStringParseString,
 }
 
 var MultilineText = Parameter{
-	ShortHelp: `A freeform DocString.`,
-	LongHelp:  `Any multiline text.`,
+	ShortHelp:      `A freeform DocString.`,
+	LongHelp:       `Any multiline text.`,
+	ParseDocString: DocStringParseString,
 }
 
 var AsyncAssertion = Parameter{
@@ -118,6 +298,7 @@ var AsyncAssertion = Parameter{
 	LongHelp: fmt.Sprintf(`
 		Eventually assertions can be made with: %q
 		Consistently assertions can be made with: %q`, EventuallyPhrases, ConsistentlyPhrases),
+	ParseString: ParseString,
 }
 
 var Reference = Parameter{
@@ -131,6 +312,7 @@ var Reference = Parameter{
 		
 		The reference must a name that can be used as a DNS subdomain name as defined in RFC 1123.
 		This is the same Kubernetes requirement for names, i.e. lowercase alphanumeric characters.`,
+	ParseString: ParseString,
 }
 
 var Command = Parameter{
@@ -141,6 +323,7 @@ var Command = Parameter{
 
 		The command will run in a shell on the container and its outputs will be captured and can
 		be asserted against in future steps.`,
+	ParseString: ParseString,
 }
 
 var Container = Parameter{
@@ -151,6 +334,7 @@ var Container = Parameter{
 		
 		The reference must a name that can be used as a DNS subdomain name as defined in RFC 1123.
 		This is the same Kubernetes requirement for names, i.e. lowercase alphanumeric characters.`,
+	ParseString: ParseString,
 }
 
 var Duration = Parameter{
@@ -161,6 +345,8 @@ var Duration = Parameter{
 		
 		A duration is a sequence of decimal numbers, each with optional fraction and a unit suffix, such as "300ms", "1.5m" or "2h45m".
 		Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`,
+	//ParseString: ParseTime,
+	ParseString: ParseString,
 }
 
 var JSONPath = Parameter{
@@ -170,48 +356,55 @@ var JSONPath = Parameter{
 	LongHelp: `https://kubernetes.io/docs/reference/kubectl/jsonpath/
 		
 		e.g. '{.metadata.name}'.`,
+	ParseString: ParseString,
 }
 
 var Matcher = Parameter{
-	Text:       "<matcher>",
-	Expression: Anything,
-	ShortHelp:  `Used in conjunction with an assertion to assert that the actual matches the expected.`,
-	LongHelp:   `To list available matchers run 'bdk matchers'.`,
+	Text:        "<matcher>",
+	Expression:  Anything,
+	ShortHelp:   `Used in conjunction with an assertion to assert that the actual matches the expected.`,
+	LongHelp:    `To list available matchers run 'bdk matchers'.`,
+	ParseString: ParseString,
 }
 
 var Text = Parameter{
-	Text:       "<text>",
-	Expression: Anything,
-	ShortHelp:  `A freeform amount of text.`,
-	LongHelp:   `This will match anything.`,
+	Text:        "<text>",
+	Expression:  Anything,
+	ShortHelp:   `A freeform amount of text.`,
+	LongHelp:    `This will match anything.`,
+	ParseString: ParseString,
 }
 
 var Number = Parameter{
-	Text:       "<number>",
-	Expression: exprNumber,
-	ShortHelp:  `A number.`,
-	LongHelp:   `Can be decimal.`,
+	Text:        "<number>",
+	Expression:  exprNumber,
+	ShortHelp:   `A number.`,
+	LongHelp:    `Can be decimal.`,
+	ParseString: ParseNumber,
 }
 
 var Array = Parameter{
-	Text:       "<array>",
-	Expression: exprArray,
-	ShortHelp:  `A set of values.`,
-	LongHelp:   `Must be space delimited.`,
+	Text:        "<array>",
+	Expression:  exprArray,
+	ShortHelp:   `A set of values.`,
+	LongHelp:    `Must be space delimited.`,
+	ParseString: ParseArray,
 }
 
 var Comparator = Parameter{
-	Text:       "<comparator>",
-	Expression: exprComparator,
-	ShortHelp:  `a numeric comparator.`,
-	LongHelp:   `One of ==, <, >, <=, >=.`,
+	Text:        "<comparator>",
+	Expression:  exprComparator,
+	ShortHelp:   `a numeric comparator.`,
+	LongHelp:    `One of ==, <, >, <=, >=.`,
+	ParseString: ParseString,
 }
 
 var ShouldOrShouldNot = Parameter{
-	Text:       "(should|should not)",
-	Expression: exprShouldOrShouldNot,
-	ShortHelp:  `A positive or negative assertion.`,
-	LongHelp:   `"to" can also be used instead of "should".`,
+	Text:        "(should|should not)",
+	Expression:  exprShouldOrShouldNot,
+	ShortHelp:   `A positive or negative assertion.`,
+	LongHelp:    `"to" can also be used instead of "should".`,
+	ParseString: ParseString,
 }
 
 var Port = Parameter{
@@ -219,18 +412,33 @@ var Port = Parameter{
 	Expression: exprPort,
 	ShortHelp:  `Port.`,
 	LongHelp:   `The port number to request. Acceptable range is 0 - 65536.`,
+	ParseString: func(input string, targetType reflect.Type) (reflect.Value, error) {
+		v, err := strconv.ParseInt(input, 10, 0)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+		if v < 0 {
+			return reflect.ValueOf(int(v)), errors.New("port must be a positive integer.")
+		}
+		if v > 65536 {
+			return reflect.ValueOf(int(v)), errors.New("port must be less than 65536.")
+		}
+		return reflect.ValueOf(int(v)), nil
+	},
 }
 
 var URLPath = Parameter{
-	Text:       "<path>",
-	Expression: exprURLPath,
-	ShortHelp:  `The path of a URL.`,
-	LongHelp:   `Anything that comes after port.`,
+	Text:        "<path>",
+	Expression:  exprURLPath,
+	ShortHelp:   `The path of a URL.`,
+	LongHelp:    `Anything that comes after port.`,
+	ParseString: ParseString,
 }
 
 var URLScheme = Parameter{
-	Text:       "<scheme>",
-	Expression: exprURLScheme,
-	ShortHelp:  `The scheme of a URL.`,
-	LongHelp:   `Must be either http or https.`,
+	Text:        "<scheme>",
+	Expression:  exprURLScheme,
+	ShortHelp:   `The scheme of a URL.`,
+	LongHelp:    `Must be either http or https.`,
+	ParseString: ParseString,
 }

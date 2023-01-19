@@ -4,11 +4,10 @@ import (
 	"context"
 
 	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/arguments"
-	"github.com/testernetes/bdk/client"
+	"github.com/testernetes/bdk/contextutils"
 	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/register"
 	"github.com/testernetes/bdk/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func init() {
@@ -23,13 +22,13 @@ var IEvict = scheme.StepDefinition{
 	When I evict pod
 	  | grace period seconds | 120 |`,
 	Parameters: []parameters.Parameter{parameters.Reference, parameters.DeleteOptions},
-	Function: func(ctx context.Context, ref string, options *arguments.DataTable) (err error) {
-		pod := register.LoadPod(ctx, ref)
+	Function: func(ctx context.Context, ref string, opts []client.DeleteOption) (err error) {
+		pod := contextutils.LoadPod(ctx, ref)
 		Expect(pod).ShouldNot(BeNil(), ErrNoResource, ref)
 
-		opts := client.DeleteOptionsFrom(pod, options)
-		c := client.MustGetClientFrom(ctx)
-		Eventually(c.Evict).WithContext(ctx).WithArguments(opts...).Should(Succeed(), "Failed to evict")
+		args := append([]interface{}{pod}, opts)
+		c := contextutils.MustGetClientFrom(ctx)
+		Eventually(c.Evict).WithContext(ctx).WithArguments(args...).Should(Succeed(), "Failed to evict")
 
 		return nil
 	},

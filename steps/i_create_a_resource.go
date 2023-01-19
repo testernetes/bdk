@@ -4,11 +4,10 @@ import (
 	"context"
 
 	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/arguments"
-	"github.com/testernetes/bdk/client"
+	"github.com/testernetes/bdk/contextutils"
 	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/register"
 	"github.com/testernetes/bdk/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func init() {
@@ -34,13 +33,17 @@ var ICreateAResource = scheme.StepDefinition{
 	  | field manager | example |
 	Then within 1s cm jsonpath '{.metadata.uid}' should not be empty`,
 	Parameters: []parameters.Parameter{parameters.Reference, parameters.CreateOptions},
-	Function: func(ctx context.Context, ref string, options *arguments.DataTable) error {
-		u := register.Load(ctx, ref)
-		Expect(u).ShouldNot(BeNil(), ErrNoResource, ref)
+	Function: func(ctx context.Context, ref string, options []client.CreateOption) error {
+		o := contextutils.LoadObject(ctx, ref)
+		Expect(o).ShouldNot(BeNil(), ErrNoResource, ref)
 
-		opts := client.CreateOptionsFrom(u, options)
-		c := client.MustGetClientFrom(ctx)
-		Eventually(c.Create).WithContext(ctx).WithArguments(opts...).Should(Succeed(), "Failed to create resource")
+		args := []interface{}{o}
+		for _, opt := range options {
+			args = append(args, opt)
+		}
+
+		c := contextutils.MustGetClientFrom(ctx)
+		Eventually(c.Create).WithContext(ctx).WithArguments(args...).Should(Succeed(), "Failed to create resource")
 
 		return nil
 	},

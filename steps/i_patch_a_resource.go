@@ -4,11 +4,10 @@ import (
 	"context"
 
 	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/arguments"
-	"github.com/testernetes/bdk/client"
+	"github.com/testernetes/bdk/contextutils"
 	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/register"
 	"github.com/testernetes/bdk/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func init() {
@@ -35,12 +34,12 @@ var IPatchAResource = scheme.StepDefinition{
 	  | patch | {"data":{"foo":"nobar"}} |
 	Then for at least 10s cm jsonpath '{.data.foo}' should equal nobar`,
 	Parameters: []parameters.Parameter{parameters.Reference, parameters.PatchOptions},
-	Function: func(ctx context.Context, ref string, options *arguments.DataTable) (err error) {
-		u := register.Load(ctx, ref)
-		Expect(u).ShouldNot(BeNil(), ErrNoResource, ref)
+	Function: func(ctx context.Context, ref string, opts []client.PatchOption) (err error) {
+		o := contextutils.LoadObject(ctx, ref)
+		Expect(o).ShouldNot(BeNil(), ErrNoResource, ref)
 
-		args := client.PatchOptionsFrom(u, options)
-		c := client.MustGetClientFrom(ctx)
+		args := append([]interface{}{o}, opts)
+		c := contextutils.MustGetClientFrom(ctx)
 		Eventually(c.Patch).WithContext(ctx).WithArguments(args...).Should(Succeed())
 
 		return nil

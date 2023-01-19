@@ -1,4 +1,4 @@
-package session
+package contextutils
 
 import (
 	"context"
@@ -14,14 +14,14 @@ func NewPodSessionsFor(ctx context.Context) context.Context {
 	return rctx
 }
 
-func Save(ctx context.Context, key string, value *gkube.PodSession) {
+func SaveSession(ctx context.Context, key string, value *gkube.PodSession) {
 	v := ctx.Value(&session{})
 	if session, ok := v.(map[string]*gkube.PodSession); ok {
 		session[key] = value
 	}
 }
 
-func Load(ctx context.Context, key string) *gkube.PodSession {
+func LoadSession(ctx context.Context, key string) *gkube.PodSession {
 	v := ctx.Value(&session{})
 	if session, ok := v.(map[string]*gkube.PodSession); ok {
 		return session[key]

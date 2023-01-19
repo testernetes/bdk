@@ -4,12 +4,11 @@ import (
 	"context"
 
 	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/arguments"
-	"github.com/testernetes/bdk/client"
+	"github.com/testernetes/bdk/contextutils"
 	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/register"
 	"github.com/testernetes/bdk/scheme"
 	"github.com/testernetes/gkube"
+	corev1 "k8s.io/api/core/v1"
 )
 
 func init() {
@@ -17,18 +16,16 @@ func init() {
 	scheme.Default.MustAddToScheme(AsyncAssertLogWithTimeout)
 }
 
-var AsyncAssertLogFunc = func(ctx context.Context, phrase, timeout, ref, not, matcher string, opts *arguments.DataTable) (err error) {
-	pod := register.LoadPod(ctx, ref)
+var AsyncAssertLogFunc = func(ctx context.Context, phrase, timeout, ref, not, matcher string, opts *corev1.PodLogOptions) (err error) {
+	pod := contextutils.LoadPod(ctx, ref)
 	Expect(pod).ShouldNot(BeNil(), ErrNoResource, ref)
 
 	//out, errOut := writer.From(ctx)
 
-	podLogOptions := client.PodLogOptionsFrom(opts)
-
 	var s *gkube.PodSession
-	c := client.MustGetClientFrom(ctx)
+	c := contextutils.MustGetClientFrom(ctx)
 	NewStringAsyncAssertion("", func() error {
-		s, err = c.Logs(ctx, pod, podLogOptions, nil, nil)
+		s, err = c.Logs(ctx, pod, opts, nil, nil)
 		return err
 	}).WithContext(ctx, timeout).Should(Succeed())
 
@@ -94,7 +91,7 @@ var AsyncAssertLog = scheme.StepDefinition{
 		When I create testernetes
 		Then testernetes logs should say Behaviour Driven Kubernetes`,
 	Parameters: []parameters.Parameter{parameters.Reference, parameters.ShouldOrShouldNot, parameters.Text, parameters.PodLogOptions},
-	Function: func(ctx context.Context, ref, not, matcher string, opts *arguments.DataTable) (err error) {
+	Function: func(ctx context.Context, ref, not, matcher string, opts *corev1.PodLogOptions) (err error) {
 		return AsyncAssertLogFunc(ctx, "", "", ref, not, matcher, opts)
 	},
 }

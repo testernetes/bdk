@@ -5,11 +5,9 @@ import (
 
 	. "github.com/onsi/gomega"
 	"github.com/testernetes/bdk/arguments"
-	"github.com/testernetes/bdk/client"
+	"github.com/testernetes/bdk/contextutils"
 	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/register"
 	"github.com/testernetes/bdk/scheme"
-	"github.com/testernetes/bdk/session"
 	"github.com/testernetes/gkube"
 )
 
@@ -21,20 +19,20 @@ func init() {
 }
 
 var IExecFunc = func(ctx context.Context, cmd []string, ref, container string) error {
-	pod := register.LoadPod(ctx, ref)
+	pod := contextutils.LoadPod(ctx, ref)
 	Expect(pod).ShouldNot(BeNil(), ErrNoResource, ref)
 
 	//out, errOut := writer.From(ctx)
 
 	var s *gkube.PodSession
-	c := client.MustGetClientFrom(ctx)
+	c := contextutils.MustGetClientFrom(ctx)
 	Eventually(func() error {
 		var err error
 		s, err = c.Exec(ctx, pod, container, cmd, nil, nil)
 		return err
 	}).WithContext(ctx).Should(Succeed(), "Could not exec in container")
 
-	session.Save(ctx, ref, s)
+	contextutils.SaveSession(ctx, ref, s)
 
 	return nil
 }
