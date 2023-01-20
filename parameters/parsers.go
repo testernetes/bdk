@@ -2,6 +2,8 @@ package parameters
 
 import (
 	"errors"
+	"io"
+	"os"
 	"reflect"
 	"strconv"
 
@@ -104,4 +106,12 @@ func DocStringParseString(docString *arguments.DocString, targetType reflect.Typ
 		return reflect.ValueOf(""), nil
 	}
 	return reflect.ValueOf(docString.Content), nil
+}
+
+func ParseWriter(input string, targetType reflect.Type) (reflect.Value, error) {
+	var writer io.Writer
+
+	writer = os.Stdout
+
+	return reflect.ValueOf(writer), nil
 }

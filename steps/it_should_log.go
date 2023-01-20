@@ -2,6 +2,7 @@ package steps
 
 import (
 	"context"
+	"time"
 
 	. "github.com/onsi/gomega"
 	"github.com/testernetes/bdk/contextutils"
@@ -16,7 +17,7 @@ func init() {
 	scheme.Default.MustAddToScheme(AsyncAssertLogWithTimeout)
 }
 
-var AsyncAssertLogFunc = func(ctx context.Context, phrase, timeout, ref, not, matcher string, opts *corev1.PodLogOptions) (err error) {
+var AsyncAssertLogFunc = func(ctx context.Context, phrase string, timeout time.Duration, ref, not, matcher string, opts *corev1.PodLogOptions) (err error) {
 	pod := contextutils.LoadPod(ctx, ref)
 	Expect(pod).ShouldNot(BeNil(), ErrNoResource, ref)
 
@@ -92,7 +93,7 @@ var AsyncAssertLog = scheme.StepDefinition{
 		Then testernetes logs should say Behaviour Driven Kubernetes`,
 	Parameters: []parameters.Parameter{parameters.Reference, parameters.ShouldOrShouldNot, parameters.Text, parameters.PodLogOptions},
 	Function: func(ctx context.Context, ref, not, matcher string, opts *corev1.PodLogOptions) (err error) {
-		return AsyncAssertLogFunc(ctx, "", "", ref, not, matcher, opts)
+		return AsyncAssertLogFunc(ctx, "", time.Second, ref, not, matcher, opts)
 	},
 }
 

@@ -3,6 +3,7 @@ package steps
 import (
 	"context"
 	"fmt"
+	"time"
 
 	. "github.com/onsi/gomega"
 	"github.com/testernetes/bdk/contextutils"
@@ -15,7 +16,7 @@ func init() {
 	scheme.Default.MustAddToScheme(AsyncAssertWithTimeout)
 }
 
-var AsyncAssertFunc = func(ctx context.Context, phrase, timeout, ref, jsonpath, not, matcher string) (err error) {
+var AsyncAssertFunc = func(ctx context.Context, phrase string, timeout time.Duration, ref, jsonpath, not, matcher string) (err error) {
 	o := contextutils.LoadObject(ctx, ref)
 	Expect(o).ShouldNot(BeNil(), ErrNoResource, ref)
 
@@ -67,6 +68,6 @@ var AsyncAssert = scheme.StepDefinition{
 		Then cm jsonpath '{.metadata.uid}' should not be empty`,
 	Parameters: []parameters.Parameter{parameters.Reference, parameters.JSONPath, parameters.ShouldOrShouldNot, parameters.Matcher},
 	Function: func(ctx context.Context, ref, jsonpath, not, matcher string) (err error) {
-		return AsyncAssertFunc(ctx, "", "", ref, jsonpath, not, matcher)
+		return AsyncAssertFunc(ctx, "", time.Second, ref, jsonpath, not, matcher)
 	},
 }

@@ -10,7 +10,7 @@ import (
 
 var _ = Describe("Datatable", func() {
 
-	Context("Marshalling", func() {
+	Context("JSON Marshalling and Unmarshalling", func() {
 
 		It("should run marshal a table to a JSON", func() {
 			table := &DataTable{

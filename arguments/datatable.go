@@ -3,6 +3,7 @@ package arguments
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	messages "github.com/cucumber/messages/go/v21"
 	"sigs.k8s.io/yaml"
@@ -39,6 +40,24 @@ func (d *DataTable) MarshalJSON() ([]byte, error) {
 		return []byte{}, err
 	}
 	return b, nil
+}
+
+func (d *DataTable) UnmarshalJSON(b []byte) error {
+	j := map[string]interface{}{}
+	err := json.Unmarshal(b, &j)
+	if err != nil {
+		return err
+	}
+	i := 0
+	d.DataTable = &messages.DataTable{}
+	for key, val := range j {
+		row := &messages.TableRow{
+			Cells: []*messages.TableCell{{Value: key}, {Value: fmt.Sprint(val)}},
+		}
+		d.DataTable.Rows = append(d.DataTable.Rows, row)
+		i++
+	}
+	return nil
 }
 
 func (d *DataTable) UnmarshalInto(o interface{}) error {

@@ -21,7 +21,7 @@ type Matcher struct {
 	Name       string
 	Text       string
 	Help       string
-	Parameters []parameters.Parameter
+	Parameters []parameters.StringParameter
 	Expression *regexp.Regexp
 	Func       interface{}
 }
@@ -117,7 +117,7 @@ func init() {
 				m := Matchers.GetMatcher(text)
 				return gkube.HaveJSONPath(j, m)
 			},
-			Parameters: []parameters.Parameter{parameters.JSONPath, parameters.Matcher},
+			Parameters: []parameters.StringParameter{parameters.JSONPath, parameters.Matcher},
 		},
 		{
 			Name: "be-empty",
@@ -130,63 +130,63 @@ func init() {
 			Text:       "say <text>",
 			Help:       "Used with a PodSession such as logs or exec",
 			Func:       gbytes.Say,
-			Parameters: []parameters.Parameter{parameters.Text},
+			Parameters: []parameters.StringParameter{parameters.Text},
 		},
 		{
 			Name:       "equal",
 			Text:       "equal <text>",
 			Help:       "Matches if strings are equal",
 			Func:       gomega.BeEquivalentTo,
-			Parameters: []parameters.Parameter{parameters.Text},
+			Parameters: []parameters.StringParameter{parameters.Text},
 		},
 		{
 			Name:       "regex",
 			Text:       "match regex <text>",
 			Help:       "Matches if regex matches.",
 			Func:       gomega.MatchRegexp,
-			Parameters: []parameters.Parameter{parameters.Text},
+			Parameters: []parameters.StringParameter{parameters.Text},
 		},
 		{
 			Name:       "len",
 			Text:       "have len <number>",
 			Help:       "Matches if the length equals expected.",
 			Func:       gomega.HaveLen,
-			Parameters: []parameters.Parameter{parameters.Number},
+			Parameters: []parameters.StringParameter{parameters.Number},
 		},
 		{
 			Name:       "contains",
 			Text:       "contains <text>",
 			Help:       "Matches if the string contains the expected text.",
 			Func:       gomega.ContainSubstring,
-			Parameters: []parameters.Parameter{parameters.Text},
+			Parameters: []parameters.StringParameter{parameters.Text},
 		},
 		{
 			Name:       "prefix",
 			Text:       "have prefix <text>",
 			Help:       "Matches if the string prefix has the expected text.",
 			Func:       gomega.HavePrefix,
-			Parameters: []parameters.Parameter{parameters.Text},
+			Parameters: []parameters.StringParameter{parameters.Text},
 		},
 		{
 			Name:       "suffix",
 			Text:       "have suffix <text>",
 			Help:       "Matches if the string suffix has the expected text.",
 			Func:       gomega.HaveSuffix,
-			Parameters: []parameters.Parameter{parameters.Text},
+			Parameters: []parameters.StringParameter{parameters.Text},
 		},
 		{
 			Name:       "numeric",
 			Text:       "be <comparator> <number>",
 			Help:       "Matches if the comparator between actual and expected passes.",
 			Func:       gomega.BeNumerically,
-			Parameters: []parameters.Parameter{parameters.Comparator, parameters.Number},
+			Parameters: []parameters.StringParameter{parameters.Comparator, parameters.Number},
 		},
 		{
 			Name:       "numeric-threshold",
 			Text:       "be ~ <number> <number>",
 			Help:       "Matches if the actual and expected numbers are about equal within a threshold.",
 			Func:       gomega.BeNumerically,
-			Parameters: []parameters.Parameter{parameters.Number, parameters.Number},
+			Parameters: []parameters.StringParameter{parameters.Number, parameters.Number},
 		},
 		{
 			Name: "true",
@@ -205,14 +205,14 @@ func init() {
 			Text:       "be an element of <text>",
 			Help:       "Matches if actual is one of the space delimited values",
 			Func:       gomega.BeElementOf,
-			Parameters: []parameters.Parameter{parameters.Array},
+			Parameters: []parameters.StringParameter{parameters.Array},
 		},
 		{
 			Name:       "consist-of",
 			Text:       "consist of <text>",
 			Help:       "Matches if actual array consists of the expected values",
 			Func:       gomega.ConsistOf,
-			Parameters: []parameters.Parameter{parameters.Array},
+			Parameters: []parameters.StringParameter{parameters.Array},
 		},
 	}
 }

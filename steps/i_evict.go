@@ -26,7 +26,11 @@ var IEvict = scheme.StepDefinition{
 		pod := contextutils.LoadPod(ctx, ref)
 		Expect(pod).ShouldNot(BeNil(), ErrNoResource, ref)
 
-		args := append([]interface{}{pod}, opts)
+		args := []interface{}{pod}
+		for _, opt := range opts {
+			args = append(args, opt)
+		}
+
 		c := contextutils.MustGetClientFrom(ctx)
 		Eventually(c.Evict).WithContext(ctx).WithArguments(args...).Should(Succeed(), "Failed to evict")
 

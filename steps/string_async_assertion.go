@@ -2,7 +2,6 @@ package steps
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	. "github.com/onsi/gomega"
@@ -33,14 +32,7 @@ func NewStringAsyncAssertion(phrase string, f interface{}) StringAsyncAssertion 
 	panic("cannot determine if eventually or consistently")
 }
 
-func (assertion StringAsyncAssertion) WithContext(ctx context.Context, timeout string) StringAsyncAssertion {
-	if timeout == "" {
-		timeout = "1s"
-	}
-	d, err := time.ParseDuration(timeout)
-	if err != nil {
-		panic(fmt.Sprintf("cannot determine timeout: %w", err))
-	}
+func (assertion StringAsyncAssertion) WithContext(ctx context.Context, d time.Duration) StringAsyncAssertion {
 	if assertion.asyncType == AsyncAssertionTypeEventually {
 		ctx, _ = context.WithTimeout(ctx, d)
 	}

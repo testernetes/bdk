@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/testernetes/bdk/parameters"
 	"github.com/testernetes/bdk/scheme"
 )
 
@@ -52,13 +53,14 @@ func printParameters(stepName string) string {
 	for _, s := range scheme.Default.GetStepDefs() {
 		if s.Name == stepName {
 			for _, p := range s.Parameters {
-				text := p.Text
-				if p.Text == "" {
+				param, ok := p.(parameters.StringParameter)
+				text := param.GetText()
+				if !ok {
 					text = "Additional Step Arguments"
 				}
 				fmt.Fprintf(buf, Examples("\n%s:"), text)
-				fmt.Fprintf(buf, Parameter(p.ShortHelp))
-				fmt.Fprintf(buf, Parameter(p.LongHelp))
+				fmt.Fprintf(buf, Parameter(p.GetShortHelp()))
+				fmt.Fprintf(buf, Parameter(p.GetLongHelp()))
 			}
 		}
 	}

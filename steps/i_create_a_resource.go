@@ -33,12 +33,12 @@ var ICreateAResource = scheme.StepDefinition{
 	  | field manager | example |
 	Then within 1s cm jsonpath '{.metadata.uid}' should not be empty`,
 	Parameters: []parameters.Parameter{parameters.Reference, parameters.CreateOptions},
-	Function: func(ctx context.Context, ref string, options []client.CreateOption) error {
+	Function: func(ctx context.Context, ref string, opts []client.CreateOption) error {
 		o := contextutils.LoadObject(ctx, ref)
 		Expect(o).ShouldNot(BeNil(), ErrNoResource, ref)
 
 		args := []interface{}{o}
-		for _, opt := range options {
+		for _, opt := range opts {
 			args = append(args, opt)
 		}
 

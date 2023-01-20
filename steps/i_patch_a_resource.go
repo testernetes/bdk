@@ -38,7 +38,11 @@ var IPatchAResource = scheme.StepDefinition{
 		o := contextutils.LoadObject(ctx, ref)
 		Expect(o).ShouldNot(BeNil(), ErrNoResource, ref)
 
-		args := append([]interface{}{o}, opts)
+		args := []interface{}{o}
+		for _, opt := range opts {
+			args = append(args, opt)
+		}
+
 		c := contextutils.MustGetClientFrom(ctx)
 		Eventually(c.Patch).WithContext(ctx).WithArguments(args...).Should(Succeed())
 
