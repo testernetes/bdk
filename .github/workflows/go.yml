@@ -3,6 +3,9 @@
 
 name: Go
 
+permissions:
+  packages: write
+
 on:
   push:
     branches: [ "main" ]
