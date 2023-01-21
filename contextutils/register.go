@@ -40,7 +40,7 @@ func LoadPod(ctx context.Context, key string) *corev1.Pod {
 	pod := &corev1.Pod{}
 	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), pod)
 	if err != nil {
-		panic(fmt.Sprintf("Could not %s as a Pod: %w", key, err))
+		panic(fmt.Errorf("Could not load %s as a Pod: %w", key, err))
 	}
 	return pod
 }

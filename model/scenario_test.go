@@ -3,18 +3,19 @@ package model
 import (
 	"context"
 	"fmt"
-	"regexp"
 
 	messages "github.com/cucumber/messages/go/v21"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/testernetes/bdk/parameters"
 	"github.com/testernetes/bdk/scheme"
 )
 
 var _ = Describe("Running Scenarios", func() {
 
 	var basicGoodStep = scheme.StepDefinition{
-		Expression: regexp.MustCompile("a (.*)"),
+		Text:       "a <text>",
+		Parameters: []parameters.Parameter{parameters.Text},
 		Function: func(ctx context.Context, s string) error {
 			if len(s) > 1 {
 				return nil
@@ -27,7 +28,7 @@ var _ = Describe("Running Scenarios", func() {
 		scheme := &scheme.Scheme{}
 
 		BeforeAll(func() {
-			Expect(func() { scheme.AddToScheme(basicGoodStep) }).ShouldNot(Panic())
+			Expect(scheme.AddToScheme(basicGoodStep)).Should(Succeed())
 		})
 
 		It("should run a basic good step", func() {

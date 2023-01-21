@@ -2,7 +2,6 @@ package contextutils
 
 import (
 	"context"
-	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -24,21 +23,16 @@ var _ = Describe("Register", func() {
 		})
 
 		It("should save into a ctx", func() {
-			Save(ctx, "pod", &unstructured.Unstructured{})
+			SaveObject(ctx, "obj", &unstructured.Unstructured{})
 			Expect(ctx.Value(&register{})).Should(Equal(map[string]*unstructured.Unstructured{
-				"pod": &unstructured.Unstructured{},
+				"obj": &unstructured.Unstructured{},
 			}))
 		})
 
 		It("should initialize a register into a ctx", func() {
-			pod := Load(ctx, "pod")
-			Expect(pod).Should(Equal(&unstructured.Unstructured{}))
+			obj := LoadObject(ctx, "obj")
+			Expect(obj).Should(Equal(&unstructured.Unstructured{}))
 		})
 	})
 
 })
-
-func TestRegister(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Register Suite")
-}

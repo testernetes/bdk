@@ -17,6 +17,7 @@ var (
 	ErrCannotConvert               = errors.New("cannot convert argument")
 	ErrUnsupportedArgumentType     = errors.New("unsupported argument type")
 	ErrMustHaveContext             = errors.New("step function must have at least Context as the first argument")
+	ErrMustHaveText                = errors.New("step must have text")
 	ErrStepDefinitionMustHaveFunc  = errors.New("must pass a function as the second argument to Register")
 	ErrTooFewArguments             = errors.New("function has too few arguments for regular expression")
 	ErrTooManyArguments            = errors.New("function has too many arguments for regular expression")
@@ -64,7 +65,10 @@ func (s StepDefinition) GetExpression() *regexp.Regexp {
 }
 
 func (sd StepDefinition) Valid() error {
-	// Validate all Parameters exist in the step text
+	if sd.Text == "" {
+		return ErrMustHaveText
+	}
+
 	err := sd.validParameters()
 	if err != nil {
 		return err
@@ -79,11 +83,13 @@ func (sd StepDefinition) Valid() error {
 }
 
 func (sd StepDefinition) hasStepArgument() bool {
-	lastParam := sd.Parameters[len(sd.Parameters)-1]
-	if _, ok := lastParam.(parameters.StringParameter); ok {
-		return false
+	if p := len(sd.Parameters) - 1; p >= 0 {
+		lastParam := sd.Parameters[p]
+		if _, ok := lastParam.(parameters.StringParameter); !ok {
+			return true
+		}
 	}
-	return true
+	return false
 }
 
 // Validates the following constraints hold for step function:

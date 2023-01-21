@@ -9,5 +9,5 @@ import (
 
 func TestArguments(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Arguments Suite")
+	RunSpecs(t, "arguments suite")
 }

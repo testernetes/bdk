@@ -299,7 +299,7 @@ var MultilineText = DocStringParameter{
 	Parser: DocStringParseString,
 }
 
-var AsyncAssertion = StringParameter{
+var AsyncAssertionPhrase = StringParameter{
 	BaseParameter: BaseParameter{
 		Expression: AsyncType,
 		ShortHelp:  `An assertion that state should be achieved or maintained.`,

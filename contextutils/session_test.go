@@ -2,7 +2,6 @@ package contextutils
 
 import (
 	"context"
-	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -24,21 +23,16 @@ var _ = Describe("session", func() {
 		})
 
 		It("should save into a ctx", func() {
-			Save(ctx, "pod", &gkube.PodSession{})
+			SaveSession(ctx, "pod", &gkube.PodSession{})
 			Expect(ctx.Value(&session{})).Should(Equal(map[string]*gkube.PodSession{
 				"pod": &gkube.PodSession{},
 			}))
 		})
 
 		It("should initialize a session into a ctx", func() {
-			pod := Load(ctx, "pod")
+			pod := LoadSession(ctx, "pod")
 			Expect(pod).Should(Equal(&gkube.PodSession{}))
 		})
 	})
 
 })
-
-func TestSession(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "session Suite")
-}

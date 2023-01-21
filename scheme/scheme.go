@@ -63,7 +63,7 @@ func (s *Scheme) StepDefFor(text string, dt *arguments.DataTable, ds *arguments.
 	// Parse regexp cature groups
 	var stepArgs []reflect.Value
 	for i, p := range stepDef.Parameters {
-		targetType := stepFunc.Type().In(i)
+		targetType := stepFunc.Type().In(i + 1)
 		var arg reflect.Value
 		var err error
 

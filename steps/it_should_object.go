@@ -47,7 +47,7 @@ var AsyncAssertWithTimeout = scheme.StepDefinition{
 		  """
 		And I create cm
 		Then within 1s cm jsonpath '{.metadata.uid}' should not be empty`,
-	Parameters: []parameters.Parameter{parameters.AsyncAssertion, parameters.Duration, parameters.Reference, parameters.JSONPath, parameters.ShouldOrShouldNot, parameters.Matcher},
+	Parameters: []parameters.Parameter{parameters.AsyncAssertionPhrase, parameters.Duration, parameters.Reference, parameters.JSONPath, parameters.ShouldOrShouldNot, parameters.Matcher},
 	Function:   AsyncAssertFunc,
 }
 

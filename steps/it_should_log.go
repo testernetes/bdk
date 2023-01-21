@@ -64,7 +64,7 @@ var AsyncAssertLogWithTimeout = scheme.StepDefinition{
 		Then within 1m testernetes logs should say Behaviour Driven Kubernetes
 		  | container | bdk   |
 		  | follow    | false |`,
-	Parameters: []parameters.Parameter{parameters.AsyncAssertion, parameters.Duration, parameters.Reference, parameters.ShouldOrShouldNot, parameters.Text, parameters.PodLogOptions},
+	Parameters: []parameters.Parameter{parameters.AsyncAssertionPhrase, parameters.Duration, parameters.Reference, parameters.ShouldOrShouldNot, parameters.Text, parameters.PodLogOptions},
 	Function:   AsyncAssertLogFunc,
 }
 

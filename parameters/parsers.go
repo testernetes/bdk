@@ -2,12 +2,17 @@ package parameters
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"reflect"
 	"strconv"
 
 	"github.com/testernetes/bdk/arguments"
+)
+
+const (
+	CannotParse = "cannot parse '%s' into a %s"
 )
 
 func ParseNumber(input string, targetType reflect.Type) (reflect.Value, error) {
@@ -27,18 +32,7 @@ func ParseNumber(input string, targetType reflect.Type) (reflect.Value, error) {
 	case reflect.Float32:
 		return ParseFloat32(input)
 	}
-	return reflect.Value{}, errors.New("Not a valid number")
-}
-
-func ParseArray(input string, targetType reflect.Type) (reflect.Value, error) {
-	if targetType.Kind() != reflect.Slice {
-		return reflect.Value{}, errors.New("Must be slice")
-	}
-	switch targetType {
-	case reflect.TypeOf([]byte(nil)):
-		return reflect.ValueOf([]byte(input)), nil
-	}
-	return reflect.Value{}, errors.New("Must be slice")
+	return reflect.Value{}, fmt.Errorf(CannotParse, input, targetType.String())
 }
 
 func ParseInt(input string) (reflect.Value, error) {
@@ -81,10 +75,6 @@ func ParseInt8(input string) (reflect.Value, error) {
 	return reflect.ValueOf(int8(v)), nil
 }
 
-func ParseString(input string, targetType reflect.Type) (reflect.Value, error) {
-	return reflect.ValueOf(input), nil
-}
-
 func ParseFloat64(input string) (reflect.Value, error) {
 	v, err := strconv.ParseFloat(input, 64)
 	if err != nil {
@@ -99,6 +89,29 @@ func ParseFloat32(input string) (reflect.Value, error) {
 		return reflect.Value{}, err
 	}
 	return reflect.ValueOf(float32(v)), nil
+}
+
+func ParseString(input string, targetType reflect.Type) (reflect.Value, error) {
+	if targetType.Kind() == reflect.String {
+		return reflect.ValueOf(input), nil
+	}
+	if targetType.Kind() == reflect.Slice {
+		if targetType == reflect.TypeOf([]byte(nil)) {
+			return reflect.ValueOf([]byte(input)), nil
+		}
+	}
+	return reflect.Value{}, fmt.Errorf(CannotParse, input, targetType.String())
+}
+
+func ParseArray(input string, targetType reflect.Type) (reflect.Value, error) {
+	if targetType.Kind() != reflect.Slice {
+		return reflect.Value{}, errors.New("Must be slice")
+	}
+	switch targetType {
+	case reflect.TypeOf([]byte(nil)):
+		return reflect.ValueOf([]byte(input)), nil
+	}
+	return reflect.Value{}, errors.New("Must be slice")
 }
 
 func DocStringParseString(docString *arguments.DocString, targetType reflect.Type) (reflect.Value, error) {

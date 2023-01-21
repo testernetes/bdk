@@ -1,4 +1,4 @@
-package model
+package contextutils
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestModels(t *testing.T) {
+func TestSession(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "models suite")
+	RunSpecs(t, "contextutils suite")
 }
