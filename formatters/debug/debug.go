@@ -1,10 +1,12 @@
-package formatters
+package debug
 
 import (
 	"github.com/kr/pretty"
 	"github.com/testernetes/bdk/model"
 )
 
-func Debug(feature *model.Feature) {
+type Printer struct{}
+
+func (p Printer) Print(feature *model.Feature) {
 	pretty.Println(feature)
 }

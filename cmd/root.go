@@ -4,10 +4,7 @@ Copyright © 2023 Matt Simons
 package cmd
 
 import (
-	"log"
-
 	"github.com/spf13/cobra"
-	"github.com/spf13/cobra/doc"
 )
 
 var plugins []string
@@ -25,11 +22,6 @@ func NewRootCommand() *cobra.Command {
 	rootCmd.AddCommand(NewTestCommand())
 	rootCmd.AddCommand(NewStepsCommand())
 	rootCmd.AddCommand(NewMatchersCommand())
-
-	err := doc.GenMarkdownTree(rootCmd, "/tmp")
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	return rootCmd
 }

@@ -1,4 +1,4 @@
-package formatters
+package json
 
 import (
 	"fmt"
@@ -7,7 +7,9 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func JSON(feature *model.Feature) {
+type Printer struct{}
+
+func (p Printer) Print(feature *model.Feature) {
 	out, _ := yaml.Marshal(feature)
 	fmt.Printf("%s\n", out)
 }

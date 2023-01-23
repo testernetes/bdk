@@ -3,18 +3,24 @@ package formatters
 import (
 	"fmt"
 
+	"github.com/testernetes/bdk/formatters/debug"
+	"github.com/testernetes/bdk/formatters/json"
+	"github.com/testernetes/bdk/formatters/simple"
 	"github.com/testernetes/bdk/model"
 )
 
-func Print(name string, feature *model.Feature) {
+type FeaturePrinter interface {
+	Print(*model.Feature)
+}
+
+func NewFormatter(name string) (FeaturePrinter, error) {
 	switch name {
 	case "json":
-		JSON(feature)
+		return &json.Printer{}, nil
 	case "simple":
-		Simple(feature)
+		return &simple.Printer{}, nil
 	case "debug":
-		Debug(feature)
-	default:
-		fmt.Println("not a valid printer")
+		return &debug.Printer{}, nil
 	}
+	return nil, fmt.Errorf("not a valid printer")
 }

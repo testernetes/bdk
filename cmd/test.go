@@ -72,7 +72,11 @@ func NewTestCommand() *cobra.Command {
 				ctx := context.TODO()
 				feature.Run(ctx)
 
-				formatters.Print(format, feature)
+				f, err := formatters.NewFormatter(format)
+				if err != nil {
+					return fmt.Errorf("error creating formatter: %s\n", err)
+				}
+				f.Print(feature)
 			}
 			return nil
 		},
