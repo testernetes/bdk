@@ -20,7 +20,7 @@ type Feature struct {
 	Scenarios []*Scenario // or Scenario Outline
 }
 
-func NewFeature(featureDoc *messages.Feature, scheme *scheme.Scheme) (*Feature, error) {
+func NewFeature(featureDoc *messages.Feature, scheme *scheme.Scheme, filters []Filter) (*Feature, error) {
 	f := &Feature{
 		Location:    featureDoc.Location,
 		Tags:        featureDoc.Tags,
@@ -41,6 +41,10 @@ func NewFeature(featureDoc *messages.Feature, scheme *scheme.Scheme) (*Feature, 
 			backgrounds = append(backgrounds, fc.Background)
 		}
 		if fc.Scenario != nil {
+			scenarioTags := NewTags(append(featureDoc.Tags, fc.Scenario.Tags...))
+			if isFiltered(scenarioTags, filters) {
+				continue
+			}
 			scenarios = append(scenarios, fc.Scenario)
 		}
 	}
@@ -52,6 +56,10 @@ func NewFeature(featureDoc *messages.Feature, scheme *scheme.Scheme) (*Feature, 
 	//	}
 	//	f.Rules = append(f.Rules, s)
 	//}
+
+	if len(scenarios) == 0 {
+		return nil, nil
+	}
 
 	if len(backgrounds) > 1 {
 		return f, errors.New("a feature can only have one background")

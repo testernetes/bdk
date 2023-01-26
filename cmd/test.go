@@ -21,6 +21,7 @@ import (
 )
 
 var format string
+var tags string
 
 // testCmd represents running a test suite
 func NewTestCommand() *cobra.Command {
@@ -51,6 +52,8 @@ func NewTestCommand() *cobra.Command {
 				panic(message)
 			})
 
+			filter := model.NewFilter(tags)
+
 			for _, gdp := range args {
 				gdf, err := os.Open(gdp)
 
@@ -64,9 +67,13 @@ func NewTestCommand() *cobra.Command {
 					continue
 				}
 
-				feature, err := model.NewFeature(gd.Feature, scheme.Default)
+				feature, err := model.NewFeature(gd.Feature, scheme.Default, filter)
 				if err != nil {
 					return fmt.Errorf("error creating feature from doc: %s\n", err)
+				}
+
+				if feature == nil {
+					continue
 				}
 
 				ctx := context.TODO()
@@ -82,5 +89,6 @@ func NewTestCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&format, "format", "f", "simple", "the format printer")
+	cmd.Flags().StringVarP(&tags, "tags", "t", "", "tags to filter")
 	return cmd
 }
