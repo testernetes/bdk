@@ -3,6 +3,7 @@ package formatters
 import (
 	"fmt"
 
+	"github.com/testernetes/bdk/formatters/configmap"
 	"github.com/testernetes/bdk/formatters/debug"
 	"github.com/testernetes/bdk/formatters/json"
 	"github.com/testernetes/bdk/formatters/simple"
@@ -15,6 +16,8 @@ type FeaturePrinter interface {
 
 func NewFormatter(name string) (FeaturePrinter, error) {
 	switch name {
+	case "configmap":
+		return &configmap.Printer{}, nil
 	case "json":
 		return &json.Printer{}, nil
 	case "simple":

@@ -35,11 +35,7 @@ func (d *DataTable) MarshalJSON() ([]byte, error) {
 
 		j[key] = v
 	}
-	b, err := json.Marshal(j)
-	if err != nil {
-		return []byte{}, err
-	}
-	return b, nil
+	return json.Marshal(j)
 }
 
 func (d *DataTable) UnmarshalJSON(b []byte) error {

@@ -10,6 +10,9 @@ import (
 type Printer struct{}
 
 func (p Printer) Print(feature *model.Feature) {
-	out, _ := yaml.Marshal(feature)
+	out, err := yaml.Marshal(feature)
+	if err != nil {
+		fmt.Println(err)
+	}
 	fmt.Printf("%s\n", out)
 }

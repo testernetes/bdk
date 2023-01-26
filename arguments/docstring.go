@@ -1,9 +1,11 @@
 package arguments
 
 import (
+	"bytes"
 	"errors"
 
 	messages "github.com/cucumber/messages/go/v21"
+	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/yaml"
 )
 
@@ -18,7 +20,9 @@ type DocString struct {
 }
 
 func (d *DocString) MarshalJSON() ([]byte, error) {
-	return []byte(d.Content), nil
+	buf := &bytes.Buffer{}
+	err := json.NewEncoder(buf).Encode(d.Content)
+	return buf.Bytes(), err
 }
 
 func (d *DocString) UnmarshalJSON(b []byte) error {
