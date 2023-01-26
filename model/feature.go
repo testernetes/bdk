@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"errors"
+	"strings"
 
 	messages "github.com/cucumber/messages/go/v21"
 	"github.com/testernetes/bdk/scheme"
@@ -30,22 +31,68 @@ func NewFeature(featureDoc *messages.Feature, scheme *scheme.Scheme, filters []F
 		Description: featureDoc.Description,
 	}
 	var rules []*messages.Rule
-	var backgrounds []*messages.Background
-	var scenarios []*messages.Scenario
+
+	var backgroundDoc *messages.Background
+	for _, fc := range featureDoc.Children {
+		if fc.Background != nil {
+			if backgroundDoc != nil {
+				return f, errors.New("a feature can only have one background")
+			}
+			backgroundDoc = fc.Background
+		}
+	}
 
 	for _, fc := range featureDoc.Children {
 		if fc.Rule != nil {
 			rules = append(rules, fc.Rule)
-		}
-		if fc.Background != nil {
-			backgrounds = append(backgrounds, fc.Background)
 		}
 		if fc.Scenario != nil {
 			scenarioTags := NewTags(append(featureDoc.Tags, fc.Scenario.Tags...))
 			if isFiltered(scenarioTags, filters) {
 				continue
 			}
-			scenarios = append(scenarios, fc.Scenario)
+
+			if len(fc.Scenario.Examples) == 0 {
+				s, err := NewScenario(backgroundDoc, fc.Scenario, scheme)
+				if err != nil {
+					return f, err
+				}
+				f.Scenarios = append(f.Scenarios, s)
+			}
+
+			for _, example := range fc.Scenario.Examples {
+				for _, r := range example.TableBody {
+					replacer := map[string]string{}
+					for i, v := range r.Cells {
+						key := "<" + example.TableHeader.Cells[i].Value + ">"
+						replacer[key] = v.Value
+					}
+					scn := deepCopyScenarioDoc(fc.Scenario)
+					for k, v := range replacer {
+						scn.Name = strings.ReplaceAll(scn.Name, k, v)
+						scn.Description = strings.ReplaceAll(scn.Description, k, v)
+						for _, s := range scn.Steps {
+							s.Text = strings.ReplaceAll(s.Text, k, v)
+							if s.DocString != nil {
+								s.DocString.Content = strings.ReplaceAll(s.DocString.Content, k, v)
+							}
+							if s.DataTable != nil {
+								for _, row := range s.DataTable.Rows {
+									for _, cell := range row.Cells {
+										cell.Value = strings.ReplaceAll(cell.Value, k, v)
+									}
+								}
+
+							}
+						}
+					}
+					s, err := NewScenario(backgroundDoc, scn, scheme)
+					if err != nil {
+						return f, err
+					}
+					f.Scenarios = append(f.Scenarios, s)
+				}
+			}
 		}
 	}
 
@@ -57,27 +104,70 @@ func NewFeature(featureDoc *messages.Feature, scheme *scheme.Scheme, filters []F
 	//	f.Rules = append(f.Rules, s)
 	//}
 
-	if len(scenarios) == 0 {
+	if len(f.Scenarios) == 0 {
 		return nil, nil
 	}
-
-	if len(backgrounds) > 1 {
-		return f, errors.New("a feature can only have one background")
-	}
-
-	var backgroundDoc *messages.Background
-	if len(backgrounds) == 1 {
-		backgroundDoc = backgrounds[0]
-	}
-
-	for _, scenarioDoc := range scenarios {
-		s, err := NewScenario(backgroundDoc, scenarioDoc, scheme)
-		if err != nil {
-			return f, err
-		}
-		f.Scenarios = append(f.Scenarios, s)
-	}
 	return f, nil
+}
+
+func deepCopyScenarioDoc(in *messages.Scenario) *messages.Scenario {
+	if in == nil {
+		return nil
+	}
+	out := &messages.Scenario{}
+
+	out.Tags = in.Tags
+	out.Keyword = in.Keyword
+	out.Name = in.Name
+	out.Description = in.Description
+	for _, s := range in.Steps {
+		out.Steps = append(out.Steps, deepCopyStepDoc(s))
+	}
+	return out
+}
+
+func deepCopyStepDoc(in *messages.Step) *messages.Step {
+	if in == nil {
+		return nil
+	}
+	out := &messages.Step{}
+	out.Keyword = in.Keyword
+	out.KeywordType = in.KeywordType
+	out.Text = in.Text
+	out.DocString = deepCopyDocString(in.DocString)
+	out.DataTable = deepCopyDataTable(in.DataTable)
+	return out
+}
+
+func deepCopyDocString(in *messages.DocString) *messages.DocString {
+	if in == nil {
+		return nil
+	}
+	out := &messages.DocString{
+		Content:   in.Content,
+		MediaType: in.MediaType,
+		Delimiter: in.Delimiter,
+	}
+	return out
+}
+
+func deepCopyDataTable(in *messages.DataTable) *messages.DataTable {
+	if in == nil {
+		return nil
+	}
+	out := &messages.DataTable{
+		Rows: []*messages.TableRow{},
+	}
+
+	for _, r := range in.Rows {
+		row := &messages.TableRow{Cells: []*messages.TableCell{}}
+		for _, c := range r.Cells {
+			cell := &messages.TableCell{Value: c.Value}
+			row.Cells = append(row.Cells, cell)
+		}
+		out.Rows = append(out.Rows, row)
+	}
+	return out
 }
 
 // Add future parallel options
