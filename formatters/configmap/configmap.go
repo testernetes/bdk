@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/spf13/viper"
 	"github.com/testernetes/bdk/model"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,12 +30,18 @@ func (p Printer) Print(feature *model.Feature) {
 		fmt.Println(err)
 		return
 	}
-	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "results", Namespace: "default"}}
-	controllerutil.CreateOrUpdate(context.Background(), c, cm, func() error {
+	name := viper.GetString("format-configmap-name")
+	namespace := viper.GetString("format-configmap-namespace")
+	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace}}
+	_, err = controllerutil.CreateOrUpdate(context.Background(), c, cm, func() error {
 		if cm.Data == nil {
 			cm.Data = map[string]string{}
 		}
 		cm.Data["results"] = string(out)
 		return nil
 	})
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 }

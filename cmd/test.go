@@ -15,6 +15,7 @@ import (
 	messages "github.com/cucumber/messages/go/v21"
 	"github.com/onsi/gomega"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/testernetes/bdk/formatters"
 	"github.com/testernetes/bdk/model"
 	"github.com/testernetes/bdk/scheme"
@@ -26,7 +27,7 @@ var tags string
 // testCmd represents running a test suite
 func NewTestCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "test [-f format] features...",
+		Use:   "test features...",
 		Short: "Run a test suite of feature files",
 		Long:  "",
 		Args:  cobra.MinimumNArgs(1),
@@ -89,6 +90,10 @@ func NewTestCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&format, "format", "f", "simple", "the format printer")
+	cmd.Flags().String("format-configmap-name", "results", "name of configmap to write results to")
+	viper.BindPFlag("format-configmap-name", cmd.Flags().Lookup("format-configmap-name"))
+	cmd.Flags().String("format-configmap-namespace", "default", "namespace of configmap to write results to")
+	viper.BindPFlag("format-configmap-namespace", cmd.Flags().Lookup("format-configmap-namespace"))
 	cmd.Flags().StringVarP(&tags, "tags", "t", "", "tags to filter")
 	return cmd
 }
