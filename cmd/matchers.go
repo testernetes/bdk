@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/testernetes/bdk/formatters/utils"
 	"github.com/testernetes/bdk/matchers"
 )
 
@@ -55,9 +56,9 @@ func printMatcherParameters(name string) string {
 				if p.Text == "" {
 					text = "Additional Step Arguments"
 				}
-				fmt.Fprintf(buf, Examples("\n%s:"), text)
-				fmt.Fprintf(buf, Parameter(p.ShortHelp))
-				fmt.Fprintf(buf, Parameter(p.LongHelp))
+				fmt.Fprintf(buf, utils.Examples("\n%s:"), text)
+				fmt.Fprintf(buf, utils.Parameter(p.ShortHelp))
+				fmt.Fprintf(buf, utils.Parameter(p.LongHelp))
 			}
 		}
 	}

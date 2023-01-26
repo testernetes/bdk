@@ -3,13 +3,16 @@ package scheme
 import (
 	"errors"
 	"fmt"
+	"io"
 	"reflect"
+	"strings"
+	"text/template"
 
 	"github.com/testernetes/bdk/arguments"
+	"github.com/testernetes/bdk/formatters/utils"
 	"github.com/testernetes/bdk/parameters"
 )
 
-// matchable errors
 var (
 	ErrNoStepDefFound = errors.New("cannot find a matching step definition")
 )
@@ -60,7 +63,7 @@ func (s *Scheme) StepDefFor(text string, dt *arguments.DataTable, ds *arguments.
 
 	captureGroups := stepDef.GetExpression().FindStringSubmatch(text)[1:]
 
-	// Parse regexp cature groups
+	// Parse regexp capture groups
 	var stepArgs []reflect.Value
 	for i, p := range stepDef.Parameters {
 		targetType := stepFunc.Type().In(i + 1)
@@ -78,9 +81,49 @@ func (s *Scheme) StepDefFor(text string, dt *arguments.DataTable, ds *arguments.
 			return stepFunc, stepArgs, fmt.Errorf("unknown parameter type %T", param)
 		}
 		if err != nil {
-			return reflect.Value{}, []reflect.Value{}, fmt.Errorf("cannot parse parameter %d: %w", i, err)
+			return stepFunc, stepArgs, fmt.Errorf("cannot parse parameter %d: %w", i, err)
 		}
 		stepArgs = append(stepArgs, arg)
 	}
 	return stepFunc, stepArgs, nil
+}
+
+func (s *Scheme) GenMarkdown(w io.Writer) error {
+
+	doc := `
+{{range . }}
+### {{printText .Text}}
+{{.Help}}
+{{printExamples .Examples}}
+{{range .Parameters}}
+{{printParameter .}}{{end}}{{end}}
+`
+
+	funcMap := map[string]any{
+		"printParameter": printParameter,
+		"printText":      printText,
+		"printExamples":  printExamples,
+	}
+	t, err := template.New("").Funcs(funcMap).Parse(doc)
+	if err != nil {
+		return err
+	}
+	return t.Execute(w, s.stepDefinitions)
+}
+
+func printExamples(examples string) string {
+	if len(examples) == 0 {
+		return examples
+	}
+	return utils.NewNormalizer(examples).Trim().Snippet("feature").String()
+}
+
+func printText(text string) string {
+	text = strings.ReplaceAll(text, "<", "&lt;")
+	text = strings.ReplaceAll(text, ">", "&gt;")
+	return text
+}
+
+func printParameter(p parameters.Parameter) string {
+	return p.Print()
 }
