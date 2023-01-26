@@ -20,7 +20,7 @@ var _ = Describe("DocString", func() {
 			}
 			json, err := json.Marshal(docstring)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(json).Should(Equal([]byte(`{"key1":"val1","key2":12}`)))
+			Expect(json).Should(Equal([]byte(`"{\"key1\":\"val1\",\"key2\":12}"`)))
 		})
 
 		It("should unmarshal a table into another interface", func() {
