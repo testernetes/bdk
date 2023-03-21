@@ -44,7 +44,7 @@ func NewScenario(bkg *messages.Background, scn *messages.Scenario, scheme *schem
 	return s, nil
 }
 
-func (s *Scenario) Run(ctx context.Context) {
+func (s *Scenario) Run(ctx context.Context) bool {
 	// add to ctx
 	// * Helper
 	ctx = contextutils.NewClientFor(ctx)
@@ -57,9 +57,10 @@ func (s *Scenario) Run(ctx context.Context) {
 	for _, step := range s.Steps {
 		step.Run(ctx)
 		if step.Execution.Result != Passed {
-			break
+			return false
 		}
 	}
+	return true
 }
 
 type Background struct {

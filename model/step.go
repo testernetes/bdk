@@ -88,8 +88,8 @@ func (s *Step) Run(ctx context.Context) {
 		r := recover()
 
 		if errors.Is(ctx.Err(), context.Canceled) {
-			s.Execution.Result = Interrupted
-			s.Execution.Message = "Step was interrupted"
+			//s.Execution.Result = Interrupted
+			//s.Execution.Message = "Step was interrupted"
 			return
 		}
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {

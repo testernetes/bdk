@@ -1,7 +1,6 @@
 package model
 
 import (
-	"context"
 	"errors"
 	"strings"
 
@@ -170,8 +169,8 @@ func deepCopyDataTable(in *messages.DataTable) *messages.DataTable {
 	return out
 }
 
-func (f *Feature) Run(ctx context.Context) {
-	for _, scenario := range f.Scenarios {
-		scenario.Run(ctx)
-	}
-}
+//func (f *Feature) Run(ctx context.Context) {
+//	for _, scenario := range f.Scenarios {
+//		scenario.Run(ctx)
+//	}
+//}

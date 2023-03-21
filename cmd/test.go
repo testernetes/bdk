@@ -67,6 +67,10 @@ func NewTestCommand() *cobra.Command {
 
 			for _, gdp := range args {
 				gdf, err := os.Open(gdp)
+				if err != nil {
+					fmt.Println(err.Error())
+					continue
+				}
 
 				gd, err := gherkin.ParseGherkinDocument(bufio.NewReader(gdf), (&messages.Incrementing{}).NewId)
 				if err != nil {
@@ -112,8 +116,11 @@ func NewTestCommand() *cobra.Command {
 					f.StartFeature(feature)
 					for _, scenario := range feature.Scenarios {
 						f.StartScenario(feature, scenario)
-						scenario.Run(ctx)
+						success := scenario.Run(ctx)
 						f.FinishScenario(feature, scenario)
+						if !success && fastFail {
+							cancel()
+						}
 					}
 					f.FinishFeature(feature)
 					f.Print(feature)
