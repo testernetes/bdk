@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"os/signal"
 	"reflect"
 	"runtime/debug"
 	"strings"
@@ -81,18 +79,12 @@ const (
 // * panics string: The step result is failed as string is a failure message typically from Gomega
 // * panics any: The step result is unknown as the step itself failed to run
 func (s *Step) Run(ctx context.Context) {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-
-	var cancel context.CancelFunc
-	ctx, cancel = context.WithCancel(ctx)
 	args := append([]reflect.Value{reflect.ValueOf(ctx)}, s.Args...)
 
 	var ret []reflect.Value
 
 	defer func() {
 		s.Execution.EndTime = time.Now()
-		signal.Stop(c)
 		r := recover()
 
 		if errors.Is(ctx.Err(), context.Canceled) {
@@ -105,7 +97,6 @@ func (s *Step) Run(ctx context.Context) {
 			s.Execution.Message = "Scenario timed out"
 			return
 		}
-		cancel()
 
 		if r != nil {
 			// Gomega panics with strings
@@ -135,15 +126,6 @@ func (s *Step) Run(ctx context.Context) {
 
 		s.Execution.Result = Passed
 		s.Execution.Message = "Step Ran Successfully"
-	}()
-
-	go func() {
-		select {
-		case <-c:
-			fmt.Printf("\nUser Interrupted, jumping to cleanup now. Press ^C again to skip cleanup.\n\n")
-			cancel()
-		case <-ctx.Done():
-		}
 	}()
 
 	s.Execution.StartTime = time.Now()

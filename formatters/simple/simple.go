@@ -33,28 +33,32 @@ func (p Printer) step(step *model.Step) {
 	case model.Unknown, model.Interrupted:
 		color.Set(color.FgRed)
 	}
-	defer color.Unset()
-
-	utils.NewNormalizer("%s%s", step.Keyword, step.Text).Indent(2).Print()
+	utils.NewNormalizer("%s%s", step.Keyword, step.Text).Trim().Indent(2).Print()
+	color.Unset()
 	if step.DocString != nil {
 		utils.NewNormalizer(step.DocString.Delimiter).Indent(2).Print()
 		utils.NewNormalizer(step.DocString.Content).IndentTabs(2).Print()
 		utils.NewNormalizer(step.DocString.Delimiter).Indent(2).Print()
 	}
 	if step.Execution.Message != "Step Ran Successfully" {
-		utils.NewNormalizer(step.Execution.Message).Indent(2).Print()
+		utils.NewNormalizer(step.Execution.Message).Indent(3).Print()
 	}
 	if step.Execution.Err != nil {
-		utils.NewNormalizer(step.Execution.Err.Error()).Indent(2).Print()
+		utils.NewNormalizer(step.Execution.Err.Error()).Indent(3).Print()
 	}
 }
 
-func (p Printer) Print(feature *model.Feature) {
+func (p Printer) StartFeature(feature *model.Feature) {
 	p.feature(feature)
-	for _, scenario := range feature.Scenarios {
-		p.scenario(scenario)
-		for _, step := range scenario.Steps {
-			p.step(step)
-		}
+}
+
+func (p Printer) FinishScenario(feature *model.Feature, scenario *model.Scenario) {
+	p.scenario(scenario)
+	for _, step := range scenario.Steps {
+		p.step(step)
 	}
 }
+
+func (p Printer) StartScenario(feature *model.Feature, scenario *model.Scenario) {}
+func (p Printer) FinishFeature(feature *model.Feature)                           {}
+func (p Printer) Print(feature *model.Feature)                                   {}

@@ -18,7 +18,7 @@ type Feature struct {
 	Description string             `json:"description"`
 
 	//Rules []*Rule
-	Scenarios []*Scenario // or Scenario Outline
+	Scenarios []*Scenario `json:"scenarios"` // or Scenario Outline
 }
 
 func NewFeature(featureDoc *messages.Feature, scheme *scheme.Scheme, filters []Filter) (*Feature, error) {
@@ -170,7 +170,6 @@ func deepCopyDataTable(in *messages.DataTable) *messages.DataTable {
 	return out
 }
 
-// Add future parallel options
 func (f *Feature) Run(ctx context.Context) {
 	for _, scenario := range f.Scenarios {
 		scenario.Run(ctx)

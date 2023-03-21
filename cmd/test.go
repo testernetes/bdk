@@ -9,7 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
 	"plugin"
+	"sync"
 
 	gherkin "github.com/cucumber/gherkin/go/v26"
 	messages "github.com/cucumber/messages/go/v21"
@@ -23,6 +25,7 @@ import (
 
 var format string
 var tags string
+var fastFail bool
 
 // testCmd represents running a test suite
 func NewTestCommand() *cobra.Command {
@@ -55,6 +58,13 @@ func NewTestCommand() *cobra.Command {
 
 			filter := model.NewFilter(tags)
 
+			f, err := formatters.NewFormatter(format)
+			if err != nil {
+				return fmt.Errorf("error creating formatter: %s\n", err)
+			}
+
+			features := []*model.Feature{}
+
 			for _, gdp := range args {
 				gdf, err := os.Open(gdp)
 
@@ -73,27 +83,57 @@ func NewTestCommand() *cobra.Command {
 					return fmt.Errorf("error creating feature from doc: %s\n", err)
 				}
 
-				if feature == nil {
-					continue
+				if feature != nil {
+					features = append(features, feature)
 				}
-
-				ctx := context.TODO()
-				feature.Run(ctx)
-
-				f, err := formatters.NewFormatter(format)
-				if err != nil {
-					return fmt.Errorf("error creating formatter: %s\n", err)
-				}
-				f.Print(feature)
 			}
+
+			ctx := context.Background()
+			c := make(chan os.Signal, 1)
+			signal.Notify(c, os.Interrupt)
+
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithCancel(ctx)
+
+			go func() {
+				select {
+				case <-c:
+					fmt.Printf("\nUser Interrupted, jumping to cleanup now. Press ^C again to skip cleanup.\n\n")
+					cancel()
+				case <-ctx.Done():
+				}
+			}()
+
+			var wg sync.WaitGroup
+			for i := range features {
+				wg.Add(1)
+				go func(feature *model.Feature) {
+					defer wg.Done()
+					f.StartFeature(feature)
+					for _, scenario := range feature.Scenarios {
+						f.StartScenario(feature, scenario)
+						scenario.Run(ctx)
+						f.FinishScenario(feature, scenario)
+					}
+					f.FinishFeature(feature)
+					f.Print(feature)
+				}(features[i])
+			}
+
+			wg.Wait()
+
+			signal.Stop(c)
+			cancel()
 			return nil
 		},
 	}
 	cmd.Flags().StringVarP(&format, "format", "f", "simple", "the format printer")
+	cmd.Flags().StringVarP(&tags, "tags", "t", "", "tags to filter")
+	cmd.Flags().BoolVarP(&fastFail, "fast-fail", "", false, "stop testing on first failure")
+
 	cmd.Flags().String("format-configmap-name", "results", "name of configmap to write results to")
 	viper.BindPFlag("format-configmap-name", cmd.Flags().Lookup("format-configmap-name"))
 	cmd.Flags().String("format-configmap-namespace", "default", "namespace of configmap to write results to")
 	viper.BindPFlag("format-configmap-namespace", cmd.Flags().Lookup("format-configmap-namespace"))
-	cmd.Flags().StringVarP(&tags, "tags", "t", "", "tags to filter")
 	return cmd
 }

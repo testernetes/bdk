@@ -50,7 +50,7 @@ var IProxyGetFunc = func(ctx context.Context, scheme, ref, port, path string, pa
 		return err
 	}).WithTimeout(time.Minute).Should(Succeed(), "Failed to proxy get")
 
-	_ = s
+	contextutils.SaveSession(ctx, ref, s)
 
 	return nil
 }

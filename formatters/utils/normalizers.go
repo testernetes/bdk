@@ -16,11 +16,18 @@ func Examples(s string) string {
 }
 
 // Parameter normalizes a command's examples to follow the conventions.
-func Parameter(s string) string {
+func HTMLParameter(s string) string {
 	if len(s) == 0 {
 		return s
 	}
 	return normalizer{s}.Trim().Definition().String()
+}
+
+func Parameter(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+	return normalizer{s}.Trim().IndentTabs(2).String()
 }
 
 type Normalizer interface {
@@ -48,7 +55,7 @@ func (s normalizer) String() string {
 }
 
 func (s normalizer) Print() {
-	fmt.Print(s.string)
+	fmt.Println(s.string)
 }
 
 func (s normalizer) Trim() Normalizer {
@@ -68,7 +75,7 @@ func (s normalizer) TrimAllTabs() Normalizer {
 		trimmed := strings.TrimSpace(line)
 		indentedLines = append(indentedLines, trimmed)
 	}
-	s.string = strings.Join(indentedLines, "\n") + "\n"
+	s.string = strings.Join(indentedLines, "\n") // + "\n"
 	return s
 }
 
@@ -99,7 +106,7 @@ func (s normalizer) Indent(by int) Normalizer {
 		indented := strings.Repeat(Indentation, by) + trimmed
 		indentedLines = append(indentedLines, indented)
 	}
-	s.string = strings.Join(indentedLines, "\n") + "\n"
+	s.string = strings.Join(indentedLines, "\n") // + "\n"
 	return s
 }
 
@@ -110,6 +117,6 @@ func (s normalizer) IndentTabs(by int) Normalizer {
 		indented := strings.Repeat(Indentation, by) + trimmed
 		indentedLines = append(indentedLines, indented)
 	}
-	s.string = strings.Join(indentedLines, "\n") + "\n"
+	s.string = strings.Join(indentedLines, "\n") // + "\n"
 	return s
 }
