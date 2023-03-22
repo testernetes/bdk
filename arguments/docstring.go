@@ -27,7 +27,9 @@ func (d *DocString) MarshalJSON() ([]byte, error) {
 
 func (d *DocString) UnmarshalJSON(b []byte) error {
 	if b != nil && d != nil {
-		d.Content = string(b)
+		d.DocString = &messages.DocString{
+			Content: string(b),
+		}
 	}
 	return nil
 }
