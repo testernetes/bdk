@@ -9,6 +9,7 @@ import (
 )
 
 type Feature struct {
+	Path        string             `json:"string"`
 	Location    *messages.Location `json:"location"`
 	Tags        []*messages.Tag    `json:"tags"`
 	Language    string             `json:"language"`
@@ -20,8 +21,9 @@ type Feature struct {
 	Scenarios []*Scenario `json:"scenarios"` // or Scenario Outline
 }
 
-func NewFeature(featureDoc *messages.Feature, scheme *scheme.Scheme, filters []Filter) (*Feature, error) {
+func NewFeature(path string, featureDoc *messages.Feature, scheme *scheme.Scheme, filters []Filter) (*Feature, error) {
 	f := &Feature{
+		Path:        path,
 		Location:    featureDoc.Location,
 		Tags:        featureDoc.Tags,
 		Language:    featureDoc.Language,

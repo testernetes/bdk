@@ -3,6 +3,7 @@ package configmap
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/spf13/viper"
@@ -53,13 +54,30 @@ func (p *Printer) UpdateConfigMap(feature *model.Feature) {
 		if cm.Data == nil {
 			cm.Data = map[string]string{}
 		}
-		cm.Data[feature.Name] = string(out)
+		cm.Data[strip(feature.Path)] = string(out)
 		return nil
 	})
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+}
+
+func strip(s string) string {
+	var result strings.Builder
+	for i := 0; i < len(s); i++ {
+		b := s[i]
+		if ('a' <= b && b <= 'z') ||
+			('A' <= b && b <= 'Z') ||
+			('0' <= b && b <= '9') ||
+			b == '.' ||
+			b == '_' {
+			result.WriteByte(b)
+		} else {
+			result.WriteByte('-')
+		}
+	}
+	return result.String()
 }
 
 func (p *Printer) Print(feature *model.Feature) {}

@@ -8,9 +8,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"plugin"
+	"strings"
 	"sync"
 
 	gherkin "github.com/cucumber/gherkin/go/v26"
@@ -66,30 +69,41 @@ func NewTestCommand() *cobra.Command {
 			features := []*model.Feature{}
 
 			for _, gdp := range args {
-				gdf, err := os.Open(gdp)
-				if err != nil {
-					fmt.Println(err.Error())
-					continue
-				}
+				err = filepath.Walk(gdp, func(path string, info fs.FileInfo, err error) error {
+					if info.IsDir() {
+						return nil
+					}
 
-				gd, err := gherkin.ParseGherkinDocument(bufio.NewReader(gdf), (&messages.Incrementing{}).NewId)
-				if err != nil {
-					return fmt.Errorf("error while loading document: %s\n", err)
-				}
-				defer gdf.Close()
+					if !strings.HasSuffix(info.Name(), ".feature") {
+						return nil
+					}
 
-				if gd.Feature == nil {
-					continue
-				}
+					gdf, err := os.Open(path)
+					if err != nil {
+						fmt.Println(err.Error())
+						return nil
+					}
+					gd, err := gherkin.ParseGherkinDocument(bufio.NewReader(gdf), (&messages.Incrementing{}).NewId)
+					if err != nil {
+						return fmt.Errorf("error while loading document: %s\n", err)
+					}
+					defer gdf.Close()
 
-				feature, err := model.NewFeature(gd.Feature, scheme.Default, filter)
-				if err != nil {
-					return fmt.Errorf("error creating feature from doc: %s\n", err)
-				}
+					if gd.Feature == nil {
+						return nil
+					}
 
-				if feature != nil {
-					features = append(features, feature)
-				}
+					feature, err := model.NewFeature(path, gd.Feature, scheme.Default, filter)
+					if err != nil {
+						return fmt.Errorf("error creating feature from doc: %s\n", err)
+					}
+
+					if feature != nil {
+						features = append(features, feature)
+					}
+					return nil
+				})
+
 			}
 
 			ctx := context.Background()
