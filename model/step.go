@@ -111,7 +111,7 @@ func (s *Step) Run(ctx context.Context) {
 				return
 			}
 			s.Execution.Result = Unknown
-			s.Execution.Message = fmt.Sprintf("step panicked in an unexpected way: %s", r)
+			s.Execution.Message = fmt.Sprintf("step panicked in an unexpected way: %v", r)
 			s.Execution.Err = errors.New(string(debug.Stack()))
 			return
 
