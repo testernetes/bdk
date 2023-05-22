@@ -1,8 +1,10 @@
 package parameters
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"strconv"
 	"time"
@@ -246,6 +248,39 @@ var ProxyGetOptions = DataTableParameter{
 			params[opt] = val
 		}
 		return reflect.ValueOf(params), nil
+	},
+}
+
+var Filename = StringParameter{
+	BaseParameter: BaseParameter{
+		Expression: Anything,
+		ShortHelp:  `Path to a Kubernetes manifest.`,
+		LongHelp: `https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects/
+
+		Can be yaml or json depending on the content type.`,
+	},
+	Text: "<filename>",
+	Parser: func(path string, targetType reflect.Type) (reflect.Value, error) {
+
+		f, err := os.Open(path)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+
+		buf := bufio.NewReader(f)
+		manifest := []byte{}
+		_, err = buf.Read(manifest)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+
+		u := &unstructured.Unstructured{}
+		err = yaml.UnmarshalStrict(manifest, u)
+		if err != nil {
+			return reflect.Value{}, err
+		}
+
+		return reflect.ValueOf(u), nil
 	},
 }
 
