@@ -75,7 +75,7 @@ func printParameters(stepName string) string {
 				if !ok {
 					text = "Additional Step Arguments"
 				}
-				fmt.Fprintf(buf, utils.Examples("\n%s:"), text)
+				fmt.Fprintf(buf, utils.Examples("\n%s:\n"), text)
 				fmt.Fprintf(buf, utils.Parameter(p.GetShortHelp()))
 				fmt.Fprintf(buf, utils.Parameter(p.GetLongHelp()))
 			}

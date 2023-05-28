@@ -103,7 +103,9 @@ func NewTestCommand() *cobra.Command {
 					}
 					return nil
 				})
-
+				if err != nil {
+					fmt.Printf("%s\n", err)
+				}
 			}
 
 			ctx := context.Background()

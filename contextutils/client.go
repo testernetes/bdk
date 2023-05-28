@@ -10,9 +10,13 @@ import (
 
 type helper struct{}
 
+var hotClient gkube.KubernetesHelper
+
 func NewClientFor(ctx context.Context, opts ...gkube.HelperOption) context.Context {
-	client := gkube.NewKubernetesHelper(opts...)
-	rctx := context.WithValue(ctx, helper{}, client)
+	if hotClient == nil {
+		hotClient = gkube.NewKubernetesHelper(opts...)
+	}
+	rctx := context.WithValue(ctx, helper{}, hotClient)
 	return rctx
 }
 

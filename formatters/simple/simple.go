@@ -19,7 +19,7 @@ func (p Printer) feature(feature *model.Feature) {
 func (p Printer) scenario(scenario *model.Scenario) {
 	color.Set(color.FgWhite)
 	defer color.Unset()
-	utils.NewNormalizer("%s: %s", scenario.Keyword, scenario.Name).Indent(1).Print()
+	utils.NewNormalizer("\n%s: %s", scenario.Keyword, scenario.Name).Indent(1).Print()
 }
 
 func (p Printer) step(step *model.Step) {

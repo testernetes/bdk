@@ -1,10 +1,9 @@
 package parameters
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
-	"os"
+	"io/ioutil"
 	"reflect"
 	"strconv"
 	"time"
@@ -261,15 +260,7 @@ var Filename = StringParameter{
 	},
 	Text: "<filename>",
 	Parser: func(path string, targetType reflect.Type) (reflect.Value, error) {
-
-		f, err := os.Open(path)
-		if err != nil {
-			return reflect.Value{}, err
-		}
-
-		buf := bufio.NewReader(f)
-		manifest := []byte{}
-		_, err = buf.Read(manifest)
+		manifest, err := ioutil.ReadFile(path)
 		if err != nil {
 			return reflect.Value{}, err
 		}
