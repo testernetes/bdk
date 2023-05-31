@@ -14,6 +14,7 @@ type Parameter interface {
 	GetShortHelp() string
 	GetLongHelp() string
 	GetExpression() string
+	ConvertsTo(reflect.Kind) bool
 	Print() string
 }
 
@@ -21,6 +22,17 @@ type BaseParameter struct {
 	ShortHelp  string
 	LongHelp   string
 	Expression string
+	Kinds      []reflect.Kind
+	// Add a Supported Kinds array for step validation
+}
+
+func (p BaseParameter) ConvertsTo(k reflect.Kind) bool {
+	for _, kind := range p.Kinds {
+		if kind == k {
+			return true
+		}
+	}
+	return false
 }
 
 func (p BaseParameter) GetShortHelp() string {

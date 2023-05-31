@@ -101,9 +101,13 @@ func (s *Step) Run(ctx context.Context) {
 		if r != nil {
 			// Gomega panics with strings
 			if message, ok := r.(string); ok {
+				if strings.HasPrefix(message, "reflect:") {
+					debug.PrintStack()
+					panic(message)
+				}
 				if strings.HasPrefix(message, "Timed out after") || strings.HasPrefix(message, "Context was cancelled after") {
 					s.Execution.Result = Timedout
-					s.Execution.Message = fmt.Sprintf("Timed out after %s", strings.Split(strings.SplitAfter(message, "after ")[1], "\n")[0])
+					s.Execution.Message = message
 					return
 				}
 				s.Execution.Result = Failed

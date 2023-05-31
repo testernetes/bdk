@@ -22,6 +22,7 @@ var (
 	ErrTooFewArguments             = errors.New("function has too few arguments for regular expression")
 	ErrTooManyArguments            = errors.New("function has too many arguments for regular expression")
 	ErrMustHaveErrReturn           = errors.New("function must only return error")
+	ErrFuncArgsMustMatchParams     = errors.New("cannot convert parameter into function argument")
 )
 
 type StepDefinition struct {
@@ -97,6 +98,7 @@ func (sd StepDefinition) hasStepArgument() bool {
 // * Function only returns an error
 // * Function accepts context as its first arugment
 // * Function has correct number of parameters
+// * Function arguments match the supported parameter kinds
 func (sd StepDefinition) validStepFunc() error {
 	vFunc := reflect.ValueOf(sd.Function)
 
@@ -129,6 +131,12 @@ func (sd StepDefinition) validStepFunc() error {
 
 	if tFunc.NumIn()-1 > len(sd.Parameters) {
 		return ErrTooManyArguments
+	}
+
+	for i := 1; i < tFunc.NumIn(); i++ {
+		if !sd.Parameters[i-1].ConvertsTo(tFunc.In(i).Kind()) {
+			return fmt.Errorf("%w, Parameter %d does not support %s", ErrFuncArgsMustMatchParams, i-1, tFunc.In(i).Kind().String())
+		}
 	}
 
 	return nil
