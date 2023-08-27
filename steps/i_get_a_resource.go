@@ -27,7 +27,7 @@ var IGetAResource = scheme.StepDefinition{
 		Expect(o).ShouldNot(BeNil(), ErrNoResource, ref)
 
 		c := contextutils.MustGetClientFrom(ctx)
-		Eventually(c.Get).WithContext(ctx).WithArguments(o).Should(Succeed(), "Failed to create resource")
+		Expect(c.Get(ctx, o)).Should(Succeed(), "Failed to create resource")
 
 		contextutils.SaveObject(ctx, ref, o)
 
