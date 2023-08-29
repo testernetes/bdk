@@ -2,6 +2,7 @@ package simple
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/fatih/color"
 	"github.com/testernetes/bdk/formatters/utils"
@@ -49,6 +50,8 @@ func (p Printer) step(step *model.Step) {
 }
 
 func (p Printer) StartFeature(feature *model.Feature) {
+	// always show color in github actions
+	color.NoColor = color.NoColor && os.Getenv("GITHUB_ACTION") == ""
 	p.feature(feature)
 }
 
