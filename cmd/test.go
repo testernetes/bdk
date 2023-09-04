@@ -124,6 +124,7 @@ func NewTestCommand() *cobra.Command {
 				}
 			}()
 
+			exitCode := 0
 			var wg sync.WaitGroup
 			for i := range features {
 				wg.Add(1)
@@ -134,8 +135,11 @@ func NewTestCommand() *cobra.Command {
 						f.StartScenario(feature, scenario)
 						success := scenario.Run(ctx)
 						f.FinishScenario(feature, scenario)
-						if !success && fastFail {
-							cancel()
+						if !success {
+							exitCode = 1
+							if fastFail {
+								cancel()
+							}
 						}
 					}
 					f.FinishFeature(feature)
@@ -147,6 +151,8 @@ func NewTestCommand() *cobra.Command {
 
 			signal.Stop(c)
 			cancel()
+
+			os.Exit(exitCode)
 			return nil
 		},
 	}
