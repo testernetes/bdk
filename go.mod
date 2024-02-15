@@ -12,6 +12,7 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.7.0
 	github.com/testernetes/gkube v0.0.0-20230113121952-45204fa1395c
+	github.com/testernetes/trackedclient v0.0.0-20220406090936-e29c7eddb8f9
 	k8s.io/api v0.26.0
 	k8s.io/apimachinery v0.26.0
 	k8s.io/client-go v0.26.0

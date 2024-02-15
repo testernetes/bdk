@@ -6,6 +6,10 @@ import (
 	messages "github.com/cucumber/messages/go/v21"
 	"github.com/testernetes/bdk/contextutils"
 	"github.com/testernetes/bdk/scheme"
+	"github.com/testernetes/gkube"
+	"github.com/testernetes/trackedclient"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 type Scenario struct {
@@ -47,7 +51,11 @@ func NewScenario(bkg *messages.Background, scn *messages.Scenario, scheme *schem
 func (s *Scenario) Run(ctx context.Context) bool {
 	// add to ctx
 	// * Helper
-	ctx = contextutils.NewClientFor(ctx)
+	tc, err := trackedclient.New(config.GetConfigOrDie(), client.Options{})
+	if err != nil {
+		panic(err)
+	}
+	ctx = contextutils.NewClientFor(ctx, gkube.WithClient(tc))
 	// * Register
 	ctx = contextutils.NewRegisterFor(ctx)
 	// * PodSessions
@@ -60,6 +68,7 @@ func (s *Scenario) Run(ctx context.Context) bool {
 			return false
 		}
 	}
+	tc.DeleteAllTracked(ctx)
 	return true
 }
 
