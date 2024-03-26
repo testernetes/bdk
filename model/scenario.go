@@ -5,7 +5,6 @@ import (
 
 	messages "github.com/cucumber/messages/go/v21"
 	"github.com/testernetes/bdk/contextutils"
-	"github.com/testernetes/bdk/scheme"
 	"github.com/testernetes/gkube"
 	"github.com/testernetes/trackedclient"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -19,11 +18,11 @@ type Scenario struct {
 	Name        string               `json:"name"`
 	Description string               `json:"description"`
 	Background  *messages.Background `json:"background"`
-	Steps       []*Step              `json:"steps"`
+	Steps       []*messages.Step     `json:"steps"`
 	//Examples    []*Examples        `json:"examples"`
 }
 
-func NewScenario(bkg *messages.Background, scn *messages.Scenario, scheme *scheme.Scheme) (*Scenario, error) {
+func NewScenario(bkg *messages.Background, scn *messages.Scenario, scheme *StepDefinitions) (*Scenario, error) {
 	if bkg == nil {
 		bkg = &messages.Background{}
 	}
@@ -35,15 +34,7 @@ func NewScenario(bkg *messages.Background, scn *messages.Scenario, scheme *schem
 		Background: bkg,
 	}
 
-	bkgSteps, err := NewSteps(bkg.Steps, scheme)
-	if err != nil {
-		return s, err
-	}
-	scnSteps, err := NewSteps(scn.Steps, scheme)
-	if err != nil {
-		return s, err
-	}
-	s.Steps = append(bkgSteps, scnSteps...)
+	s.Steps = append(bkg.Steps, scn.Steps...)
 
 	return s, nil
 }
@@ -55,6 +46,8 @@ func (s *Scenario) Run(ctx context.Context) bool {
 	if err != nil {
 		panic(err)
 	}
+	defer tc.DeleteAllTracked(ctx)
+
 	ctx = contextutils.NewClientFor(ctx, gkube.WithClient(tc))
 	// * Register
 	ctx = contextutils.NewRegisterFor(ctx)
@@ -63,12 +56,16 @@ func (s *Scenario) Run(ctx context.Context) bool {
 	// * PortForwarders
 	// * out and errOut Writers
 	for _, step := range s.Steps {
-		step.Run(ctx)
-		if step.Execution.Result != Passed {
+		// find a match from step definitions
+		steprunner := Default.Eval(ctx, step)
+		if steprunner == nil {
+			return false
+		}
+		steprunner.Run()
+		if steprunner.Execution.Result != Passed {
 			return false
 		}
 	}
-	tc.DeleteAllTracked(ctx)
 	return true
 }
 

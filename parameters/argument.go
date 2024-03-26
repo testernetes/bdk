@@ -1,8 +1,8 @@
-package arguments
+package parameters
 
 import "encoding/json"
 
-type Argument interface {
+type StepArgument interface {
 	UnmarshalInto(interface{}) error
 	json.Marshaler
 	json.Unmarshaler

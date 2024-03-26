@@ -1,4 +1,4 @@
-package arguments
+package parameters
 
 import (
 	"testing"

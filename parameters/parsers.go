@@ -1,6 +1,7 @@
 package parameters
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -8,12 +9,85 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/testernetes/bdk/arguments"
+	messages "github.com/cucumber/messages/go/v21"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/yaml"
 )
 
 const (
 	CannotParse = "cannot parse '%s' into a %s"
 )
+
+func marshalDataTable(dt *messages.DataTable) ([]byte, error) {
+	j := map[string]interface{}{}
+	for _, row := range dt.Rows {
+		if len(row.Cells) != 2 {
+			return []byte{}, ErrTableMustBeWidthTwo
+		}
+		key := row.Cells[0].Value
+		val := row.Cells[1].Value
+
+		// Get the right type
+		var v interface{}
+		err := yaml.Unmarshal([]byte(val), &v)
+		if err != nil {
+			return []byte{}, err
+		}
+
+		j[key] = v
+	}
+	return json.Marshal(j)
+}
+
+func ParseDataTable(dt *messages.DataTable, targetType reflect.Type) (_ reflect.Value, err error) {
+	var o any
+	switch targetType.Kind() {
+	case reflect.Ptr:
+		o = reflect.New(targetType)
+		if _, ok := o.(*messages.DataTable); ok {
+			o = dt
+		} else {
+			var b []byte
+			b, err = marshalDataTable(dt)
+			err = yaml.Unmarshal(b, o)
+		}
+	default:
+		return reflect.Value{}, fmt.Errorf(CannotParse, "DataTable (step argument)", targetType.String())
+	}
+
+	return reflect.ValueOf(o), err
+}
+
+func ParseDocString(ds *messages.DocString, targetType reflect.Type) (_ reflect.Value, err error) {
+	var o any
+	switch targetType.Kind() {
+	case reflect.Ptr:
+		o = reflect.New(targetType)
+		switch u := o.(type) {
+		case *messages.DocString:
+			o = ds
+		case *unstructured.Unstructured:
+			if u.GetAPIVersion() == "" {
+				return reflect.ValueOf(u), errors.New("Provided test case resource has an empty API Version")
+			}
+			if u.GetKind() == "" {
+				return reflect.ValueOf(u), errors.New("Provided test case resource has an empty Kind")
+			}
+			if u.GetName() == "" {
+				return reflect.ValueOf(u), errors.New("Provided test case resource has an empty Name")
+			}
+		default:
+			b := []byte(ds.Content)
+			err = yaml.Unmarshal(b, o)
+		}
+	case reflect.String:
+		o = ds.Content
+	default:
+		return reflect.Value{}, fmt.Errorf(CannotParse, "DocString (step argument)", targetType.String())
+	}
+
+	return reflect.ValueOf(o), err
+}
 
 func ParseNumber(input string, targetType reflect.Type) (reflect.Value, error) {
 	switch targetType.Kind() {
@@ -112,13 +186,6 @@ func ParseArray(input string, targetType reflect.Type) (reflect.Value, error) {
 		return reflect.ValueOf([]byte(input)), nil
 	}
 	return reflect.Value{}, errors.New("Must be slice")
-}
-
-func DocStringParseString(docString *arguments.DocString, targetType reflect.Type) (reflect.Value, error) {
-	if docString == nil {
-		return reflect.ValueOf(""), nil
-	}
-	return reflect.ValueOf(docString.Content), nil
 }
 
 func ParseWriter(input string, targetType reflect.Type) (reflect.Value, error) {

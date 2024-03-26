@@ -10,8 +10,6 @@ import (
 	"time"
 
 	messages "github.com/cucumber/messages/go/v21"
-	"github.com/testernetes/bdk/arguments"
-	"github.com/testernetes/bdk/scheme"
 )
 
 //        Unspecified,
@@ -27,8 +25,8 @@ type Step struct {
 	Keyword     string                   `json:"keyword"`
 	KeywordType messages.StepKeywordType `json:"keywordType,omitempty"`
 	Text        string                   `json:"text"`
-	DocString   *arguments.DocString     `json:"docString,omitempty"`
-	DataTable   *arguments.DataTable     `json:"dataTable,omitempty"`
+	DocString   *parameter.DocString     `json:"docString,omitempty"`
+	DataTable   *parameter.DataTable     `json:"dataTable,omitempty"`
 
 	// Step Definition
 	Func reflect.Value   `json:"-"`
@@ -78,9 +76,8 @@ const (
 // * returns err: The step result is unknown as the step itself failed to run
 // * panics string: The step result is failed as string is a failure message typically from Gomega
 // * panics any: The step result is unknown as the step itself failed to run
-func (s *Step) Run(ctx context.Context) {
-	args := append([]reflect.Value{reflect.ValueOf(ctx)}, s.Args...)
-
+func (s *Step) Run() {
+	ctx := s.Args[0].Interface().(context.Context)
 	var ret []reflect.Value
 
 	defer func() {
@@ -133,47 +130,5 @@ func (s *Step) Run(ctx context.Context) {
 	}()
 
 	s.Execution.StartTime = time.Now()
-	ret = s.Func.Call(args)
-}
-
-func NewStep(stepDoc *messages.Step, scheme *scheme.Scheme) (*Step, error) {
-	s := &Step{
-		Location:    stepDoc.Location,
-		Keyword:     stepDoc.Keyword,
-		KeywordType: stepDoc.KeywordType,
-		Text:        stepDoc.Text,
-	}
-
-	var stepArgument arguments.Argument
-	if stepDoc.DocString != nil {
-		s.DocString = &arguments.DocString{stepDoc.DocString}
-		stepArgument = s.DocString
-	}
-	if stepDoc.DataTable != nil {
-		s.DataTable = &arguments.DataTable{stepDoc.DataTable}
-		stepArgument = s.DataTable
-	}
-
-	_ = stepArgument
-	var err error
-	s.Func, s.Args, err = scheme.StepDefFor(s.Text, s.DataTable, s.DocString)
-	if err != nil {
-		return nil, err
-	}
-
-	s.Execution.Result = Skipped
-
-	return s, nil
-}
-
-func NewSteps(stepDocs []*messages.Step, scheme *scheme.Scheme) ([]*Step, error) {
-	var steps []*Step
-	for _, stepDoc := range stepDocs {
-		step, err := NewStep(stepDoc, scheme)
-		if err != nil {
-			return nil, err
-		}
-		steps = append(steps, step)
-	}
-	return steps, nil
+	ret = s.Func.Call(s.Args)
 }

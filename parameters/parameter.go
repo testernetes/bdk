@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/testernetes/bdk/arguments"
+	messages "github.com/cucumber/messages/go/v21"
 	"github.com/testernetes/bdk/formatters/utils"
 )
 
@@ -18,7 +18,13 @@ type Parameter interface {
 	Print() string
 }
 
+type StepArgParameter interface {
+	Parameter
+	IsStepArg() bool
+}
+
 type BaseParameter struct {
+	Text       string
 	ShortHelp  string
 	LongHelp   string
 	Expression string
@@ -51,7 +57,6 @@ var _ Parameter = (*StringParameter)(nil)
 
 type StringParameter struct {
 	BaseParameter
-	Text   string
 	Parser func(string, reflect.Type) (reflect.Value, error)
 }
 
@@ -69,11 +74,15 @@ func (p StringParameter) Print() string {
 	return buf.String()
 }
 
-var _ Parameter = (*DocStringParameter)(nil)
+var _ StepArgParameter = (*DocStringParameter)(nil)
 
 type DocStringParameter struct {
 	BaseParameter
-	Parser func(*arguments.DocString, reflect.Type) (reflect.Value, error)
+	Parser func(*messages.DocString, reflect.Type) (reflect.Value, error)
+}
+
+func (p DocStringParameter) IsStepArg() bool {
+	return true
 }
 
 func (p DocStringParameter) Print() string {
@@ -84,11 +93,15 @@ func (p DocStringParameter) Print() string {
 	return buf.String()
 }
 
-var _ Parameter = (*DataTableParameter)(nil)
+var _ StepArgParameter = (*DataTableParameter)(nil)
 
 type DataTableParameter struct {
 	BaseParameter
-	Parser func(*arguments.DataTable, reflect.Type) (reflect.Value, error)
+	Parser func(*messages.DataTable, reflect.Type) (reflect.Value, error)
+}
+
+func (p DataTableParameter) IsStepArg() bool {
+	return true
 }
 
 func (p DataTableParameter) Print() string {
@@ -99,4 +112,18 @@ func (p DataTableParameter) Print() string {
 	fmt.Fprintf(buf, utils.NewNormalizer(p.GetLongHelp()).TrimAllTabs().String())
 	fmt.Fprintf(buf, "```\n")
 	return buf.String()
+}
+
+var NoStepArg StepArgParameter = &noStepArg{}
+
+type noStepArg struct {
+	BaseParameter
+}
+
+func (p *noStepArg) IsStepArg() bool {
+	return false
+}
+
+func (p *noStepArg) Print() string {
+	return "No Supported Step Arguments"
 }
