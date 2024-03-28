@@ -26,10 +26,17 @@ func SaveObject(ctx context.Context, key string, value *unstructured.Unstructure
 
 func LoadObject(ctx context.Context, key string) *unstructured.Unstructured {
 	v := ctx.Value(&register{})
-	if objRegister, ok := v.(map[string]*unstructured.Unstructured); ok {
-		return objRegister[key]
+	objRegister, ok := v.(map[string]*unstructured.Unstructured)
+	if !ok {
+		panic("no object store")
 	}
-	return nil
+
+	if u, ok := objRegister[key]; ok {
+		return u
+	}
+
+	objRegister[key] = &unstructured.Unstructured{}
+	return objRegister[key]
 }
 
 func LoadPod(ctx context.Context, key string) *corev1.Pod {

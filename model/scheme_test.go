@@ -1,4 +1,4 @@
-package scheme_test
+package model
 
 import (
 	"context"
@@ -8,10 +8,9 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
 	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/scheme"
 )
 
-var GoodStep = scheme.StepDefinition{
+var GoodStep = StepDefinition{
 	Text:       "a <text>",
 	Parameters: []parameters.Parameter{parameters.Text},
 	Function: func(ctx context.Context, s string) error {
@@ -22,7 +21,7 @@ var GoodStep = scheme.StepDefinition{
 	},
 }
 
-var StepWithoutContext = scheme.StepDefinition{
+var StepWithoutContext = StepDefinition{
 	Text: "a <text>",
 	Function: func(s string) error {
 		if len(s) > 1 {
@@ -32,21 +31,21 @@ var StepWithoutContext = scheme.StepDefinition{
 	},
 }
 
-var StepWithoutArgs = scheme.StepDefinition{
+var StepWithoutArgs = StepDefinition{
 	Text: "a <text>",
 	Function: func() error {
 		return nil
 	},
 }
 
-var StepWithoutFunc = scheme.StepDefinition{
+var StepWithoutFunc = StepDefinition{
 	Text:     "a <text>",
 	Function: "notafunction",
 }
 
-var StepWithoutText = scheme.StepDefinition{}
+var StepWithoutText = StepDefinition{}
 
-var StepTooFewArgs = scheme.StepDefinition{
+var StepTooFewArgs = StepDefinition{
 	Text:       "a <text>",
 	Parameters: []parameters.Parameter{parameters.Text},
 	Function: func(ctx context.Context) error {
@@ -54,7 +53,7 @@ var StepTooFewArgs = scheme.StepDefinition{
 	},
 }
 
-var StepTooManyArgs = scheme.StepDefinition{
+var StepTooManyArgs = StepDefinition{
 	Text:       "a <text>",
 	Parameters: []parameters.Parameter{parameters.Text},
 	Function: func(ctx context.Context, s, b string) error {
@@ -62,24 +61,25 @@ var StepTooManyArgs = scheme.StepDefinition{
 	},
 }
 
-var _ = Describe("Scheme", func() {
-	Context("Adding Steps to Scheme", func() {
-		DescribeTable("AddToScheme function",
-			func(step scheme.StepDefinition, m types.GomegaMatcher) {
-				s := scheme.Scheme{}
-				Expect(s.AddToScheme(step)).Should(m)
+var _ = Describe("scheme", func() {
+	Context("Adding Steps to scheme", func() {
+		DescribeTable("AddTofunction",
+			func(step StepDefinition, m types.GomegaMatcher) {
+				s := 
+			}
+				Expect(s.AddTostep)).Should(m)
 			},
 			Entry("should register a good step", GoodStep, Succeed()),
-			Entry("should not register a step without a context", StepWithoutContext, MatchError(scheme.ErrMustHaveContext)),
-			Entry("should not register a step without any arguments", StepWithoutArgs, MatchError(scheme.ErrMustHaveContext)),
-			Entry("should not register a step without any text", StepWithoutText, MatchError(scheme.ErrMustHaveText)),
-			Entry("should not register a step without a function", StepWithoutFunc, MatchError(scheme.ErrStepDefinitionMustHaveFunc)),
-			Entry("should not register a step which has too few args for the regular expression", StepTooFewArgs, MatchError(scheme.ErrTooFewArguments)),
-			Entry("should not register a step which has too many args for the regular expression", StepTooManyArgs, MatchError(scheme.ErrTooManyArguments)),
+			Entry("should not register a step without a context", StepWithoutContext, MatchError(ErrMustHaveContext)),
+			Entry("should not register a step without any arguments", StepWithoutArgs, MatchError(ErrMustHaveContext)),
+			Entry("should not register a step without any text", StepWithoutText, MatchError(ErrMustHaveText)),
+			Entry("should not register a step without a function", StepWithoutFunc, MatchError(ErrStepDefinitionMustHaveFunc)),
+			Entry("should not register a step which has too few args for the regular expression", StepTooFewArgs, MatchError(ErrTooFewArguments)),
+			Entry("should not register a step which has too many args for the regular expression", StepTooManyArgs, MatchError(ErrTooManyArguments)),
 		)
 	})
 
-	Context("Find steps in the scheme", func() {
+	Context("Find steps in the , func() {
 
 	})
 })

@@ -1,4 +1,4 @@
-package parameters
+package stepdef
 
 import (
 	messages "github.com/cucumber/messages/go/v21"

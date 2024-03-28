@@ -22,7 +22,7 @@ type Scenario struct {
 	//Examples    []*Examples        `json:"examples"`
 }
 
-func NewScenario(bkg *messages.Background, scn *messages.Scenario, scheme *StepDefinitions) (*Scenario, error) {
+func NewScenario(bkg *messages.Background, scn *messages.Scenario) (*Scenario, error) {
 	if bkg == nil {
 		bkg = &messages.Background{}
 	}
@@ -57,12 +57,12 @@ func (s *Scenario) Run(ctx context.Context) bool {
 	// * out and errOut Writers
 	for _, step := range s.Steps {
 		// find a match from step definitions
-		steprunner := Default.Eval(ctx, step)
-		if steprunner == nil {
+		stepFunction := StepFunctions.Eval(ctx, step)
+		if stepFunction == nil {
 			return false
 		}
-		steprunner.Run()
-		if steprunner.Execution.Result != Passed {
+		stepFunction.Run()
+		if stepFunction.Execution.Result != Passed {
 			return false
 		}
 	}

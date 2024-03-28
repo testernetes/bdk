@@ -2,37 +2,39 @@ package steps
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/contextutils"
-	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/scheme"
+	"github.com/onsi/gomega/types"
+	"github.com/testernetes/bdk/stepdef"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func init() {
-	scheme.Default.MustAddToScheme(AsyncAssert)
-	scheme.Default.MustAddToScheme(AsyncAssertWithTimeout)
-}
+var AsyncAssertFunc = func(ctx context.Context, cl client.WithWatch, phrase string, timeout time.Duration, ref *unstructured.Unstructured, jsonpath string, not bool, matcher types.GomegaMatcher) (err error) {
 
-var AsyncAssertFunc = func(ctx context.Context, phrase string, timeout time.Duration, ref, jsonpath, not, matcher string) (err error) {
-	o := contextutils.LoadObject(ctx, ref)
-	Expect(o).ShouldNot(BeNil(), ErrNoResource, ref)
+	ctx, _ = context.WithTimeout(ctx, timeout)
+	i, err := cl.Watch(ctx, ref)
 
-	// nest the jsonpath transformer with the matcher
-	matcher = fmt.Sprintf("jsonpath '%s' %s", jsonpath, matcher)
-
-	c := contextutils.MustGetClientFrom(ctx)
-	NewStringAsyncAssertion(phrase, c.Object).
-		WithContext(ctx, timeout).
-		WithArguments(o).
-		ShouldOrShouldNot(not, matcher)
-
+	for {
+		select {
+		case <-ctx.Done():
+			i.Stop()
+			return
+		case event := <-i.ResultChan():
+			var success bool
+			success, err = matcher.Match(event.Object)
+			if err != nil {
+				continue
+			}
+			if success {
+				return nil
+			}
+		}
+	}
 	return nil
 }
 
-var AsyncAssertWithTimeout = scheme.StepDefinition{
+var AsyncAssertWithTimeout = stepdef.StepDefinition{
 	Name: "it-should-object-duration",
 	Text: "<assertion> <duration> <reference> jsonpath <jsonpath> (should|should not) <matcher>",
 	Help: `Asserts that the referenced resource will satisfy the matcher in the specified duration`,
@@ -47,11 +49,10 @@ var AsyncAssertWithTimeout = scheme.StepDefinition{
 		  """
 		And I create cm
 		Then within 1s cm jsonpath '{.metadata.uid}' should not be empty`,
-	Parameters: []parameters.Parameter{parameters.AsyncAssertionPhrase, parameters.Duration, parameters.Reference, parameters.JSONPath, parameters.ShouldOrShouldNot, parameters.Matcher},
-	Function:   AsyncAssertFunc,
+	Function: AsyncAssertFunc,
 }
 
-var AsyncAssert = scheme.StepDefinition{
+var AsyncAssert = stepdef.StepDefinition{
 	Name: "it-should-object",
 	Text: "<reference> jsonpath <jsonpath> (should|should not) <matcher>",
 	Help: `Asserts that the referenced resource will satisfy the matcher`,
@@ -66,7 +67,6 @@ var AsyncAssert = scheme.StepDefinition{
 		  """
 		And I create cm
 		Then cm jsonpath '{.metadata.uid}' should not be empty`,
-	Parameters: []parameters.Parameter{parameters.Reference, parameters.JSONPath, parameters.ShouldOrShouldNot, parameters.Matcher},
 	Function: func(ctx context.Context, ref, jsonpath, not, matcher string) (err error) {
 		return AsyncAssertFunc(ctx, "", time.Second, ref, jsonpath, not, matcher)
 	},
