@@ -5,29 +5,59 @@ import (
 	"time"
 
 	"github.com/onsi/gomega/types"
+	"github.com/pkg/errors"
 	"github.com/testernetes/bdk/stepdef"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var AsyncAssertFunc = func(ctx context.Context, cl client.WithWatch, phrase string, timeout time.Duration, ref *unstructured.Unstructured, jsonpath string, not bool, matcher types.GomegaMatcher) (err error) {
+var AsyncAssertFunc = func(ctx context.Context, cl client.WithWatch, assertion stepdef.Assertion, timeout time.Duration, ref *unstructured.Unstructured, desiredMatch bool, matcher types.GomegaMatcher) (err error) {
 
 	ctx, _ = context.WithTimeout(ctx, timeout)
+
 	i, err := cl.Watch(ctx, ref)
+	if err != nil {
+		return err
+	}
+	defer i.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			i.Stop()
 			return
 		case event := <-i.ResultChan():
-			var success bool
-			success, err = matcher.Match(event.Object)
-			if err != nil {
+			if event.Type != watch.Modified && event.Type != watch.Added {
 				continue
 			}
-			if success {
-				return nil
+
+			if event.Type == watch.Error {
+				err = errors.New(event.Object.(*metav1.Status).String())
+				continue
+			}
+
+			var matches bool
+			matches, err = matcher.Match(event.Object)
+			if err != nil {
+				return err
+			}
+
+			if matches == desiredMatch {
+				if assertion == stepdef.EventuallyAssertion {
+					return nil
+				}
+			}
+
+			if matches != desiredMatch {
+				if desiredMatch {
+					err = errors.New(matcher.FailureMessage(event.Object))
+				} else {
+					err = errors.New(matcher.NegatedFailureMessage(event.Object))
+				}
+				if assertion == stepdef.ConsistentlyAssertion {
+					return err
+				}
 			}
 		}
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/testernetes/bdk/contextutils"
 	"github.com/testernetes/bdk/stepdef"
 	"github.com/testernetes/bdk/steps"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -91,7 +92,10 @@ func (s *stepFunctions) Eval(ctx context.Context, step *messages.Step) *Step {
 // return just an interface in future
 func (sf *stepFunctions) Register(stepDefs ...stepdef.StepDefinition) {
 	for _, s := range stepDefs {
-		sf.register(s)
+		err := sf.register(s)
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -118,6 +122,10 @@ func (sf *stepFunctions) register(input stepdef.StepDefinition) (err error) {
 	s.function, err = processFunction(s.Function)
 	if err != nil {
 		return err
+	}
+
+	if !s.function.In(1).Implements(reflect.TypeOf((*client.Client)(nil)).Elem()) {
+		otherIns += 1
 	}
 
 	// validate parameters and check matches regex capture groups and replace text with regex
@@ -200,12 +208,18 @@ func (sf stepFunction) GetRunner(ctx context.Context, step *messages.Step) (*Ste
 		Text:        step.Text,
 		Args:        []reflect.Value{reflect.ValueOf(ctx)},
 	}
+	otherIns := 1
+
+	if sf.function.In(1).Implements(reflect.TypeOf((*client.Client)(nil)).Elem()) {
+		runner.Args = append(runner.Args, reflect.ValueOf(contextutils.MustGetClientFrom(ctx)))
+		otherIns += 1
+	}
 
 	captureGroups := sf.re.FindStringSubmatch(step.Text)[1:]
 
 	// Parse regexp capture groups
 	for i, stringValue := range captureGroups {
-		targetType := sf.function.In(i + 1)
+		targetType := sf.function.In(i + otherIns)
 		p := sf.parameters[i]
 
 		arg, err := p.Parse(ctx, stringValue, targetType)
@@ -217,7 +231,7 @@ func (sf stepFunction) GetRunner(ctx context.Context, step *messages.Step) (*Ste
 
 	if sf.StepArg.StepArgType() != stepdef.NoStepArgType {
 		targetType := sf.function.In(sf.function.NumIn() - 1)
-		arg, err := sf.StepArg.Parse(step, targetType)
+		arg, err := sf.StepArg.Parse(ctx, step, targetType)
 		if err != nil {
 			return nil, fmt.Errorf("cannot parse step arg: %w", err)
 		}

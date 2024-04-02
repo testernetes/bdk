@@ -3,18 +3,12 @@ package steps
 import (
 	"context"
 
-	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/contextutils"
-	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/scheme"
+	"github.com/testernetes/bdk/stepdef"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func init() {
-	scheme.Default.MustAddToScheme(IPatchAResource)
-}
-
-var IPatchAResource = scheme.StepDefinition{
+var IPatchAResource = stepdef.StepDefinition{
 	Name: "i-patch",
 	Text: "I patch <reference>",
 	Help: `Patches the referenced resource. Step will fail if the reference was not defined in a previous step.`,
@@ -33,19 +27,11 @@ var IPatchAResource = scheme.StepDefinition{
 	When I patch cm
 	  | patch | {"data":{"foo":"nobar"}} |
 	Then for at least 10s cm jsonpath '{.data.foo}' should equal nobar`,
-	Parameters: []parameters.Parameter{parameters.Reference, parameters.PatchOptions},
-	Function: func(ctx context.Context, ref string, opts []client.PatchOption) (err error) {
-		o := contextutils.LoadObject(ctx, ref)
-		Expect(o).ShouldNot(BeNil(), ErrNoResource, ref)
-
-		args := []interface{}{o}
-		for _, opt := range opts {
-			args = append(args, opt)
-		}
-
-		c := contextutils.MustGetClientFrom(ctx)
-		Eventually(c.Patch).WithContext(ctx).WithArguments(args...).Should(Succeed())
-
-		return nil
+	// TODO StepArg:
+	Function: func(ctx context.Context, c client.Client, ref *unstructured.Unstructured, opts []client.PatchOption) (err error) {
+		var p client.Patch // TODO
+		return clientDo(ctx, func() error {
+			return c.Patch(ctx, ref, p, opts...)
+		})
 	},
 }

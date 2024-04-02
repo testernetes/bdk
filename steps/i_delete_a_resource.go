@@ -4,17 +4,12 @@ import (
 	"context"
 
 	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/contextutils"
-	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/scheme"
+	"github.com/testernetes/bdk/stepdef"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func init() {
-	scheme.Default.MustAddToScheme(IDeleteAResource)
-}
-
-var IDeleteAResource = scheme.StepDefinition{
+var IDeleteAResource = stepdef.StepDefinition{
 	Name: "i-delete",
 	Text: "I delete <reference>",
 	Help: "Deletes the referenced resource. Step will fail if the reference was not defined in a previous step.",
@@ -33,18 +28,9 @@ var IDeleteAResource = scheme.StepDefinition{
 	And I delete cm
 	  | grace period seconds | 30         |
 	  | propagation policy   | Foreground |`,
-	Parameters: []parameters.Parameter{parameters.Reference, parameters.DeleteOptions},
-	Function: func(ctx context.Context, ref string, opts []client.DeleteOption) error {
-		o := contextutils.LoadObject(ctx, ref)
-		Expect(o).ShouldNot(BeNil(), ErrNoResource, ref)
-
-		args := []interface{}{o}
-		for _, opt := range opts {
-			args = append(args, opt)
-		}
-		c := contextutils.MustGetClientFrom(ctx)
-		Eventually(c.Delete).WithContext(ctx).WithArguments(args...).Should(Succeed(), "Failed to delete resource")
-
-		return nil
+	Function: func(ctx context.Context, c client.Client, ref *unstructured.Unstructured, opts []client.DeleteOption) error {
+		return clientDo(ctx, func() error {
+			return c.Delete(ctx, ref, opts...)
+		})
 	},
 }

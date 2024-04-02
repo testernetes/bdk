@@ -3,7 +3,6 @@ package steps
 import (
 	"context"
 
-	"github.com/testernetes/bdk/contextutils"
 	"github.com/testernetes/bdk/stepdef"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -28,18 +27,23 @@ var ICreateAResource = stepdef.StepDefinition{
 	  | field manager | example |
 	Then within 1s cm jsonpath '{.metadata.uid}' should not be empty`,
 	StepArg: stepdef.CreateOptions,
-	Function: func(ctx context.Context, reference *unstructured.Unstructured, opts []client.CreateOption) (err error) {
-		c := contextutils.MustGetClientFrom(ctx)
-		for {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
-				err = c.Create(ctx, reference, opts...)
-				if err == nil {
-					return nil
-				}
+	Function: func(ctx context.Context, c client.Client, reference *unstructured.Unstructured, opts []client.CreateOption) (err error) {
+		return clientDo(ctx, func() error {
+			return c.Create(ctx, reference, opts...)
+		})
+	},
+}
+
+func clientDo(ctx context.Context, f func() error) (err error) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			err = f()
+			if err == nil {
+				return nil
 			}
 		}
-	},
+	}
 }

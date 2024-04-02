@@ -32,7 +32,7 @@ type StringParameter interface {
 
 type StepArgument interface {
 	Parameter
-	Parse(*messages.Step, reflect.Type) (reflect.Value, error)
+	Parse(context.Context, *messages.Step, reflect.Type) (reflect.Value, error)
 	StepArgType() StepArgType
 }
 
@@ -82,7 +82,7 @@ type DocStringArgument struct {
 	name        string
 	description string
 	help        string
-	parser      func(*messages.DocString, reflect.Type) (reflect.Value, error)
+	parser      func(context.Context, *messages.DocString, reflect.Type) (reflect.Value, error)
 }
 
 func (p DocStringArgument) Name() string {
@@ -101,11 +101,11 @@ func (p DocStringArgument) StepArgType() StepArgType {
 	return DocStringStepArgType
 }
 
-func (p DocStringArgument) Parse(s *messages.Step, t reflect.Type) (reflect.Value, error) {
+func (p DocStringArgument) Parse(ctx context.Context, s *messages.Step, t reflect.Type) (reflect.Value, error) {
 	if s.DataTable != nil {
 		return reflect.Value{}, fmt.Errorf("expected a DocString but found a DataTable")
 	}
-	return p.parser(s.DocString, t)
+	return p.parser(ctx, s.DocString, t)
 }
 
 func (p DocStringArgument) Print() string {
@@ -122,7 +122,7 @@ type DataTableArgument struct {
 	name        string
 	description string
 	help        string
-	parser      func(*messages.DataTable, reflect.Type) (reflect.Value, error)
+	parser      func(context.Context, *messages.DataTable, reflect.Type) (reflect.Value, error)
 }
 
 func (p DataTableArgument) Name() string {
@@ -141,11 +141,11 @@ func (p DataTableArgument) StepArgType() StepArgType {
 	return DataTableStepArgType
 }
 
-func (p DataTableArgument) Parse(s *messages.Step, t reflect.Type) (reflect.Value, error) {
+func (p DataTableArgument) Parse(ctx context.Context, s *messages.Step, t reflect.Type) (reflect.Value, error) {
 	if s.DocString != nil {
 		return reflect.Value{}, fmt.Errorf("expected a DataTable but found a DocString")
 	}
-	return p.parser(s.DataTable, t)
+	return p.parser(ctx, s.DataTable, t)
 }
 
 func (p DataTableArgument) Print() string {
@@ -174,7 +174,7 @@ func (p noStepArg) Help() string {
 	return ""
 }
 
-func (p noStepArg) Parse(s *messages.Step, t reflect.Type) (reflect.Value, error) {
+func (p noStepArg) Parse(ctx context.Context, s *messages.Step, t reflect.Type) (reflect.Value, error) {
 	if s.DocString != nil || s.DataTable != nil {
 		return reflect.Value{}, fmt.Errorf("step does not support step arguments")
 	}

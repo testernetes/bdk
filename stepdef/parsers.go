@@ -1,6 +1,7 @@
 package stepdef
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 
 	messages "github.com/cucumber/messages/go/v21"
 	"github.com/onsi/gomega/types"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
 )
@@ -40,7 +42,7 @@ func marshalDataTable(dt *messages.DataTable) ([]byte, error) {
 	return json.Marshal(j)
 }
 
-func ParseDataTable(dt *messages.DataTable, targetType reflect.Type) (_ reflect.Value, err error) {
+func ParseDataTable(ctx context.Context, dt *messages.DataTable, targetType reflect.Type) (_ reflect.Value, err error) {
 	var o any
 	switch targetType.Kind() {
 	case reflect.Ptr:
@@ -61,7 +63,7 @@ func ParseDataTable(dt *messages.DataTable, targetType reflect.Type) (_ reflect.
 
 type stringParsers map[reflect.Type]func(string) (reflect.Value, error)
 
-func (p stringParsers) Parse(s string, t reflect.Type) (reflect.Value, error) {
+func (p stringParsers) Parse(ctx context.Context, s string, t reflect.Type) (reflect.Value, error) {
 	parser, supportedType := p[t]
 	if !supportedType {
 
@@ -70,47 +72,72 @@ func (p stringParsers) Parse(s string, t reflect.Type) (reflect.Value, error) {
 	return parser(s)
 }
 
+var i interface{}
+
 var StringParsers = stringParsers{
-	reflect.TypeOf(""):          ParseString,
-	reflect.TypeOf(int(0)):      ParseInt,
-	reflect.TypeOf(int64(0)):    ParseInt64,
-	reflect.TypeOf(int32(0)):    ParseInt32,
-	reflect.TypeOf(int16(0)):    ParseInt16,
-	reflect.TypeOf(int8(0)):     ParseInt8,
-	reflect.TypeOf(float64(0)):  ParseFloat64,
-	reflect.TypeOf(float32(0)):  ParseFloat32,
-	reflect.TypeOf([]byte(nil)): ParseBytes,
-	reflect.TypeOf(false):       ParseBool,
+	reflect.TypeOf(""):          parseString,
+	reflect.TypeOf(int(0)):      parseInt,
+	reflect.TypeOf(int64(0)):    parseInt64,
+	reflect.TypeOf(int32(0)):    parseInt32,
+	reflect.TypeOf(int16(0)):    parseInt16,
+	reflect.TypeOf(int8(0)):     parseInt8,
+	reflect.TypeOf(float64(0)):  parseFloat64,
+	reflect.TypeOf(float32(0)):  parseFloat32,
+	reflect.TypeOf([]byte(nil)): parseBytes,
+	reflect.TypeOf(false):       parseBool,
 
 	//TODO uint uint8 uint16 uint32 uint64 uintptr
 
-	reflect.TypeOf(time.Duration(0)):                  ParseGeneric(time.ParseDuration),
-	reflect.TypeOf((*unstructured.Unstructured)(nil)): ParseUnstructured,
+	reflect.TypeOf(Assertion("")):                     parseAssertion,
+	reflect.TypeOf(time.Duration(0)):                  parseGeneric(time.ParseDuration),
+	reflect.TypeOf((*unstructured.Unstructured)(nil)): parseUnstructured,
+	reflect.TypeOf((*corev1.Pod)(nil)):                parseUnstructured,
+	reflect.TypeOf((*corev1.PodSession)(nil)):         parsePodSession,
+	reflect.TypeOf((types.GomegaMatcher)(nil)):        Matchers.ParseMatcher,
 	//reflect.TypeOf(([]client.CreateOption)(nil)):      ParseCreateOptions,
-	reflect.TypeOf((types.GomegaMatcher)(nil)): ParseMatcher,
+
+	// best effort json unmarshalling to interface
+	reflect.TypeOf(i): parseAny,
 }
 
-func ParseGeneric[T any](f func(string) (T, error)) func(string) (reflect.Value, error) {
-	return func(s string) (reflect.Value, error) {
-		v, err := f(s)
-		return reflect.ValueOf(v), err
+func parseGeneric[T any, S string | []byte](f func(S) (T, error)) func(string) (reflect.Value, error) {
+	var s S
+	switch any(s).(type) {
+	case string:
+		return func(s string) (reflect.Value, error) {
+			v, err := f(any(s).(S))
+			return reflect.ValueOf(v), err
+		}
+	case []byte:
+		return func(s string) (reflect.Value, error) {
+			b := []byte(s)
+			v, err := f(any(b).(S))
+			return reflect.ValueOf(v), err
+		}
 	}
+	panic("cannot get here")
 }
 
-func ParseString(s string) (reflect.Value, error) {
+func parseAny(s string) (reflect.Value, error) {
+	var v any
+	err := yaml.Unmarshal([]byte(s), v)
+	return reflect.ValueOf(v), err
+}
+
+func parseString(s string) (reflect.Value, error) {
 	return reflect.ValueOf(s), nil
 }
 
-func ParseBytes(s string) (reflect.Value, error) {
+func parseBytes(s string) (reflect.Value, error) {
 	return reflect.ValueOf([]byte(s)), nil
 }
 
-func ParseBool(s string) (reflect.Value, error) {
+func parseBool(s string) (reflect.Value, error) {
 	b := strings.Contains(s, "true")
 	return reflect.ValueOf(b), nil
 }
 
-func ParseUnstructured(s string) (reflect.Value, error) {
+func parseUnstructured(s string) (reflect.Value, error) {
 	u := &unstructured.Unstructured{}
 	err := yaml.Unmarshal([]byte(s), u)
 
@@ -126,14 +153,17 @@ func ParseUnstructured(s string) (reflect.Value, error) {
 	return reflect.ValueOf(u), err
 }
 
-func ParseDocString(ds *messages.DocString, targetType reflect.Type) (_ reflect.Value, err error) {
+func parseDocString(ctx context.Context, ds *messages.DocString, targetType reflect.Type) (_ reflect.Value, err error) {
 	if targetType == reflect.TypeOf((*messages.DocString)(nil)) {
 		return reflect.ValueOf(ds), nil
 	}
-	return StringParsers.Parse(ds.Content, targetType)
+	if targetType == reflect.TypeOf((*unstructured.Unstructured)(nil)) {
+		return parseUnstructured(ds.Content)
+	}
+	return StringParsers.Parse(ctx, ds.Content, targetType)
 }
 
-func ParseInt(input string) (reflect.Value, error) {
+func parseInt(input string) (reflect.Value, error) {
 	v, err := strconv.ParseInt(input, 10, 0)
 	if err != nil {
 		return reflect.Value{}, err
@@ -141,7 +171,7 @@ func ParseInt(input string) (reflect.Value, error) {
 	return reflect.ValueOf(int(v)), nil
 }
 
-func ParseInt64(input string) (reflect.Value, error) {
+func parseInt64(input string) (reflect.Value, error) {
 	v, err := strconv.ParseInt(input, 10, 64)
 	if err != nil {
 		return reflect.Value{}, err
@@ -149,7 +179,7 @@ func ParseInt64(input string) (reflect.Value, error) {
 	return reflect.ValueOf(v), nil
 }
 
-func ParseInt32(input string) (reflect.Value, error) {
+func parseInt32(input string) (reflect.Value, error) {
 	v, err := strconv.ParseInt(input, 10, 32)
 	if err != nil {
 		return reflect.Value{}, err
@@ -157,7 +187,7 @@ func ParseInt32(input string) (reflect.Value, error) {
 	return reflect.ValueOf(int32(v)), nil
 }
 
-func ParseInt16(input string) (reflect.Value, error) {
+func parseInt16(input string) (reflect.Value, error) {
 	v, err := strconv.ParseInt(input, 10, 16)
 	if err != nil {
 		return reflect.Value{}, err
@@ -165,7 +195,7 @@ func ParseInt16(input string) (reflect.Value, error) {
 	return reflect.ValueOf(int16(v)), nil
 }
 
-func ParseInt8(input string) (reflect.Value, error) {
+func parseInt8(input string) (reflect.Value, error) {
 	v, err := strconv.ParseInt(input, 10, 8)
 	if err != nil {
 		return reflect.Value{}, err
@@ -173,7 +203,7 @@ func ParseInt8(input string) (reflect.Value, error) {
 	return reflect.ValueOf(int8(v)), nil
 }
 
-func ParseFloat64(input string) (reflect.Value, error) {
+func parseFloat64(input string) (reflect.Value, error) {
 	v, err := strconv.ParseFloat(input, 64)
 	if err != nil {
 		return reflect.Value{}, err
@@ -181,10 +211,29 @@ func ParseFloat64(input string) (reflect.Value, error) {
 	return reflect.ValueOf(v), nil
 }
 
-func ParseFloat32(input string) (reflect.Value, error) {
+func parseFloat32(input string) (reflect.Value, error) {
 	v, err := strconv.ParseFloat(input, 32)
 	if err != nil {
 		return reflect.Value{}, err
 	}
 	return reflect.ValueOf(float32(v)), nil
+}
+
+func parseAssertion(phrase string) (reflect.Value, error) {
+	if contains(phrase, EventuallyPhrases) {
+		return reflect.ValueOf(EventuallyAssertion), nil
+	}
+	if contains(phrase, ConsistentlyPhrases) {
+		return reflect.ValueOf(ConsistentlyAssertion), nil
+	}
+	return reflect.Value{}, errors.New("cannot determine if eventually or consistently")
+}
+
+func contains(s string, a []string) bool {
+	for i := range a {
+		if a[i] == s {
+			return true
+		}
+	}
+	return false
 }

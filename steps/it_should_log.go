@@ -6,16 +6,10 @@ import (
 
 	. "github.com/onsi/gomega"
 	"github.com/testernetes/bdk/contextutils"
-	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/scheme"
+	"github.com/testernetes/bdk/stepdef"
 	"github.com/testernetes/gkube"
 	corev1 "k8s.io/api/core/v1"
 )
-
-func init() {
-	scheme.Default.MustAddToScheme(AsyncAssertLog)
-	scheme.Default.MustAddToScheme(AsyncAssertLogWithTimeout)
-}
 
 var AsyncAssertLogFunc = func(ctx context.Context, phrase string, timeout time.Duration, ref, not, matcher string, opts *corev1.PodLogOptions) (err error) {
 	pod := contextutils.LoadPod(ctx, ref)
@@ -39,7 +33,7 @@ var AsyncAssertLogFunc = func(ctx context.Context, phrase string, timeout time.D
 	return nil
 }
 
-var AsyncAssertLogWithTimeout = scheme.StepDefinition{
+var AsyncAssertLogWithTimeout = stepdef.StepDefinition{
 	Name: "it-should-log-duration",
 	Text: "<assertion> <duration> <reference> logs (should|should not) say <text>",
 	Help: `Asserts that the referenced resource will log something within the specified duration`,
@@ -64,11 +58,10 @@ var AsyncAssertLogWithTimeout = scheme.StepDefinition{
 		Then within 1m testernetes logs should say Behaviour Driven Kubernetes
 		  | container | bdk   |
 		  | follow    | false |`,
-	Parameters: []parameters.Parameter{parameters.AsyncAssertionPhrase, parameters.Duration, parameters.Reference, parameters.ShouldOrShouldNot, parameters.Text, parameters.PodLogOptions},
-	Function:   AsyncAssertLogFunc,
+	Function: AsyncAssertLogFunc,
 }
 
-var AsyncAssertLog = scheme.StepDefinition{
+var AsyncAssertLog = stepdef.StepDefinition{
 	Name: "it-should-log",
 	Text: "<reference> logs (should|should not) say <text>",
 	Help: `Asserts that the referenced resource will log something within the specified duration`,
@@ -91,7 +84,6 @@ var AsyncAssertLog = scheme.StepDefinition{
 		  """
 		When I create testernetes
 		Then testernetes logs should say Behaviour Driven Kubernetes`,
-	Parameters: []parameters.Parameter{parameters.Reference, parameters.ShouldOrShouldNot, parameters.Text, parameters.PodLogOptions},
 	Function: func(ctx context.Context, ref, not, matcher string, opts *corev1.PodLogOptions) (err error) {
 		return AsyncAssertLogFunc(ctx, "", time.Second, ref, not, matcher, opts)
 	},

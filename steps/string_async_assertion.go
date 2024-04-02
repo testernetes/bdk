@@ -1,13 +1,8 @@
 package steps
 
 import (
-	"context"
-	"time"
-
-	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
-	"github.com/testernetes/bdk/matchers"
-	"github.com/testernetes/bdk/parameters"
+	"github.com/testernetes/bdk/stepdef"
 )
 
 type AsyncAssertionType uint
@@ -23,37 +18,13 @@ type StringAsyncAssertion struct {
 }
 
 func NewStringAsyncAssertion(phrase string, f interface{}) StringAsyncAssertion {
-	if contains(phrase, parameters.EventuallyPhrases) {
+	if contains(phrase, stepdef.EventuallyPhrases) {
 		return StringAsyncAssertion{AsyncAssertionTypeEventually, Eventually(f)}
 	}
-	if contains(phrase, parameters.ConsistentlyPhrases) {
+	if contains(phrase, stepdef.ConsistentlyPhrases) {
 		return StringAsyncAssertion{AsyncAssertionTypeConsistently, Consistently(f)}
 	}
 	panic("cannot determine if eventually or consistently")
-}
-
-func (assertion StringAsyncAssertion) WithContext(ctx context.Context, d time.Duration) StringAsyncAssertion {
-	if assertion.asyncType == AsyncAssertionTypeEventually {
-		ctx, _ = context.WithTimeout(ctx, d)
-	}
-	assertion.AsyncAssertion = assertion.AsyncAssertion.WithTimeout(d).WithContext(ctx)
-	return assertion
-}
-
-func (assertion StringAsyncAssertion) WithArguments(args ...interface{}) StringAsyncAssertion {
-	assertion.AsyncAssertion = assertion.AsyncAssertion.WithArguments(args...)
-	return assertion
-}
-
-func (assertion StringAsyncAssertion) ShouldOrShouldNot(not, matcher string) bool {
-	m := matchers.Matchers.GetMatcher(matcher)
-	if not == "" {
-		return assertion.AsyncAssertion.Should(m)
-	}
-	if not == "not" {
-		return assertion.AsyncAssertion.ShouldNot(m)
-	}
-	panic("cannot determine if should or should not")
 }
 
 func contains(s string, a []string) bool {

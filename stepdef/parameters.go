@@ -8,7 +8,6 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
-	"time"
 
 	messages "github.com/cucumber/messages/go/v21"
 	"github.com/testernetes/bdk/contextutils"
@@ -37,6 +36,13 @@ const (
 var (
 	EventuallyPhrases   = []string{"", "within", "in less than", "in under", "in no more than"}
 	ConsistentlyPhrases = []string{"for at least", "for no less than"}
+)
+
+type Assertion string
+
+const (
+	EventuallyAssertion   Assertion = "Eventually"
+	ConsistentlyAssertion Assertion = "Consistently"
 )
 
 var CreateOptions = DataTableArgument{
@@ -101,7 +107,7 @@ var ProxyGetOptions = DataTableArgument{
 
 		ProxyGet Options:
 		| string | string |`,
-	parser: func(table *messages.DataTable, targetType reflect.Type) (reflect.Value, error) {
+	parser: func(ctx context.Context, table *messages.DataTable, targetType reflect.Type) (reflect.Value, error) {
 		params := make(map[string]string)
 		if table == nil {
 			return reflect.ValueOf(params), nil
@@ -124,7 +130,7 @@ var Manifest = DocStringArgument{
 	help: `https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects/
 
 		Can be yaml or json depending on the content type.`,
-	parser: ParseDocString,
+	parser: parseDocString,
 }
 
 var Script = DocStringArgument{
@@ -132,14 +138,14 @@ var Script = DocStringArgument{
 	description: `A script.`,
 	help: `The script will run in the specified shell or if none is specified /bin/sh.
 		Its outputs will be captured and can be asserted against in future steps.`,
-	parser: ParseDocString,
+	parser: parseDocString,
 }
 
 var MultiLineText = DocStringArgument{
 	name:        "MultiLine Text",
 	description: `A freeform DocString.`,
 	help:        `Any multiline text.`,
-	parser:      ParseDocString,
+	parser:      parseDocString,
 }
 
 var StringParameters = stringParameters{}
@@ -147,7 +153,7 @@ var StringParameters = stringParameters{}
 type stringParameters []StringParameter
 
 func (sp *stringParameters) SubstituteParameters(step string) (expression string, params []StringParameter, err error) {
-	re := regexp.MustCompile(`(?:{\w+})+`)
+	re := regexp.MustCompile(`(?:{[\w\|]+})+`)
 	matches := re.FindAllStringSubmatch(step, -1)
 	if len(matches) == 0 {
 		return step, params, nil
@@ -211,7 +217,7 @@ func init() {
 			help: fmt.Sprintf(`
 		Eventually assertions can be made with: %q
 		Consistently assertions can be made with: %q`, EventuallyPhrases, ConsistentlyPhrases),
-			parser: ParseString,
+			parser: StringParsers.Parse,
 		},
 		stringParameter{
 			name:        "{reference}",
@@ -240,7 +246,7 @@ func init() {
 
 		The command will run in a shell on the container and its outputs will be captured and can
 		be asserted against in future steps.`,
-			parser: ParseString,
+			parser: StringParsers.Parse,
 		},
 		stringParameter{
 			name:        "{container}",
@@ -250,7 +256,7 @@ func init() {
 
 		The reference must a name that can be used as a DNS subdomain name as defined in RFC 1123.
 		This is the same Kubernetes requirement for names, i.e. lowercase alphanumeric characters.`,
-			parser: ParseString,
+			parser: StringParsers.Parse,
 		},
 		stringParameter{
 			name:        "{duration}",
@@ -260,74 +266,67 @@ func init() {
 
 		A duration is a sequence of decimal numbers, each with optional fraction and a unit suffix, such as "300ms", "1.5m" or "2h45m".
 		Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`,
-			parser: func(duration string, targetType reflect.Type) (reflect.Value, error) {
-				if duration == "" {
-					duration = "1s"
-				}
-				d, err := time.ParseDuration(duration)
-				if err != nil {
-					return reflect.Value{}, fmt.Errorf("cannot determine duration: %w", err)
-				}
-				return reflect.ValueOf(d), nil
-			},
+			parser: StringParsers.Parse,
 		},
 		stringParameter{
-			name:        "{jsonpath}",
-			expression:  SingleQuoted,
-			description: `A JSON Path to a field in the referenced resource.`,
-			help: `https://kubernetes.io/docs/reference/kubectl/jsonpath/
-
-		e.g. '{.metadata.name}'.`,
-			parser: ParseString,
+			name:        "{should|should not}",
+			expression:  exprShouldOrShouldNot,
+			description: `Used in conjunction with an assertion to assert that the actual matches the expected.`,
+			help:        `To list available matchers run 'bdk matchers'.`,
+			parser: func(ctx context.Context, s string, t reflect.Type) (_ reflect.Value, err error) {
+				if t.Kind() != reflect.Bool {
+					return reflect.Value{}, errors.New("should or should not only supports parsing to bool")
+				}
+				if s == "should" {
+					return reflect.ValueOf(true), nil
+				}
+				if s == "should not" {
+					return reflect.ValueOf(false), nil
+				}
+				return reflect.Value{}, errors.New("should or should not expression failed")
+			},
 		},
 		stringParameter{
 			name:        "{matcher}",
 			expression:  Anything,
 			description: `Used in conjunction with an assertion to assert that the actual matches the expected.`,
 			help:        `To list available matchers run 'bdk matchers'.`,
-			parser:      ParseString,
+			parser:      StringParsers.Parse,
 		},
 		stringParameter{
 			name:        "{text}",
 			expression:  Anything,
 			description: `A freeform amount of text.`,
 			help:        `This will match anything.`,
-			parser:      ParseString,
+			parser:      StringParsers.Parse,
 		},
 		stringParameter{
 			name:        "{number}",
 			expression:  exprNumber,
 			description: `A number.`,
 			help:        `Can be decimal.`,
-			parser:      ParseNumber,
+			parser:      StringParsers.Parse,
 		},
+		//stringParameter{
+		//	name:        "{array}",
+		//	expression:  exprArray,
+		//	description: `A set of values.`,
+		//	help:        `Must be space delimited.`,
+		//	parser:      ParseArray,
+		//},
 		stringParameter{
-			name:        "{array}",
-			expression:  exprArray,
-			description: `A set of values.`,
-			help:        `Must be space delimited.`,
-			parser:      ParseArray,
-		},
-		stringParameter{
-			name:        "<comparator>",
+			name:        "{comparator}",
 			expression:  exprComparator,
 			description: `a numeric comparator.`,
 			help:        `One of ==, <, >, <=, >=.`,
-			parser:      ParseString,
-		},
-		stringParameter{
-			name:        "(should|should not)",
-			expression:  exprShouldOrShouldNot,
-			description: `A positive or negative assertion.`,
-			help:        `"to" can also be used instead of "should".`,
-			parser:      ParseString,
+			parser:      StringParsers.Parse,
 		},
 		stringParameter{
 			name:        "{port}",
 			expression:  exprPort,
 			description: `Port.`,
 			help:        `The port number to request. Acceptable range is 0 - 65536.`,
-			parser: func(input string, targetType reflect.Type) (reflect.Value, error) {
+			parser: func(ctx context.Context, input string, targetType reflect.Type) (reflect.Value, error) {
 				v, err := strconv.ParseInt(input, 10, 0)
 				if err != nil {
 					return reflect.Value{}, err
@@ -352,14 +351,14 @@ func init() {
 			expression:  exprURLPath,
 			description: `The path of a URL.`,
 			help:        `Anything that comes after port.`,
-			parser:      ParseString,
+			parser:      StringParsers.Parse,
 		},
 		stringParameter{
+			name:        "{scheme}",
 			expression:  exprURLScheme,
 			description: `The scheme of a URL.`,
 			help:        `Must be either http or https.`,
-			name:        "{scheme}",
-			parser:      ParseString,
+			parser:      StringParsers.Parse,
 		},
 	)
 }
