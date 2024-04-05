@@ -1,4 +1,4 @@
-package contextutils
+package store
 
 import (
 	"testing"
@@ -9,5 +9,5 @@ import (
 
 func TestSession(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "contextutils suite")
+	RunSpecs(t, "store suite")
 }

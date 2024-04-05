@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	messages "github.com/cucumber/messages/go/v21"
-	"github.com/testernetes/bdk/scheme"
 )
 
 type Feature struct {
@@ -21,7 +20,7 @@ type Feature struct {
 	Scenarios []*Scenario `json:"scenarios"` // or Scenario Outline
 }
 
-func NewFeature(path string, featureDoc *messages.Feature, scheme *scheme.Scheme, filters []Filter) (*Feature, error) {
+func NewFeature(path string, featureDoc *messages.Feature, filters []Filter) (*Feature, error) {
 	f := &Feature{
 		Path:        path,
 		Location:    featureDoc.Location,
@@ -54,7 +53,7 @@ func NewFeature(path string, featureDoc *messages.Feature, scheme *scheme.Scheme
 			}
 
 			if len(fc.Scenario.Examples) == 0 {
-				s, err := NewScenario(backgroundDoc, fc.Scenario, scheme)
+				s, err := NewScenario(backgroundDoc, fc.Scenario)
 				if err != nil {
 					return f, err
 				}
@@ -87,7 +86,7 @@ func NewFeature(path string, featureDoc *messages.Feature, scheme *scheme.Scheme
 							}
 						}
 					}
-					s, err := NewScenario(backgroundDoc, scn, scheme)
+					s, err := NewScenario(backgroundDoc, scn)
 					if err != nil {
 						return f, err
 					}

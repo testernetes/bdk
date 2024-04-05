@@ -7,15 +7,13 @@ import (
 	messages "github.com/cucumber/messages/go/v21"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/scheme"
+	"github.com/testernetes/bdk/stepdef"
 )
 
 var _ = Describe("Running Scenarios", func() {
 
-	var basicGoodStep = scheme.StepDefinition{
-		Text:       "a <text>",
-		Parameters: []parameters.Parameter{parameters.Text},
+	var basicGoodStep = stepdef.StepDefinition{
+		Text: "a <text>",
 		Function: func(ctx context.Context, s string) error {
 			if len(s) > 1 {
 				return nil
@@ -25,10 +23,10 @@ var _ = Describe("Running Scenarios", func() {
 	}
 
 	Context("Running Basic Scenarios", Ordered, func() {
-		scheme := &scheme.Scheme{}
+		scheme := &stepFunctions{}
 
 		BeforeAll(func() {
-			Expect(scheme.AddToScheme(basicGoodStep)).Should(Succeed())
+			Expect(scheme.register(basicGoodStep)).Should(Succeed())
 		})
 
 		It("should run a basic good step", func() {

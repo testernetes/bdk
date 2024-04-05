@@ -2,40 +2,43 @@ package steps
 
 import (
 	"context"
+	"fmt"
 	"time"
 
-	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/contextutils"
 	"github.com/testernetes/bdk/stepdef"
 	"github.com/testernetes/gkube"
 	corev1 "k8s.io/api/core/v1"
 )
 
-var AsyncAssertLogFunc = func(ctx context.Context, phrase string, timeout time.Duration, ref, not, matcher string, opts *corev1.PodLogOptions) (err error) {
-	pod := contextutils.LoadPod(ctx, ref)
-	Expect(pod).ShouldNot(BeNil(), ErrNoResource, ref)
-
-	//out, errOut := writer.From(ctx)
-
-	var s *gkube.PodSession
-	c := contextutils.MustGetClientFrom(ctx)
-	NewStringAsyncAssertion("", func() error {
-		s, err = c.Logs(ctx, pod, opts, nil, nil)
+var AsyncAssertLogFunc = func(ctx context.Context, c gkube.KubernetesHelper, assert stepdef.Assert, timeout time.Duration, pod *corev1.Pod, desiredMatch bool, text string, opts *corev1.PodLogOptions) (err error) {
+	s, err := c.Logs(ctx, pod, opts, nil, nil)
+	if err != nil {
 		return err
-	}).WithContext(ctx, timeout).Should(Succeed())
+	}
+	defer s.Out.CancelDetects()
 
-	matcher = "say " + matcher
-
-	NewStringAsyncAssertion(phrase, s).
-		WithContext(ctx, timeout).
-		ShouldOrShouldNot(not, matcher)
-
+	retry := true
+	for retry {
+		select {
+		case <-time.After(timeout):
+			if desiredMatch {
+				return fmt.Errorf("did not find '%s' in logs:\n%s", text, s.Out.Contents())
+			}
+		case <-ctx.Done():
+			return
+		case <-s.Buffer().Detect(text):
+			if desiredMatch {
+				return nil
+			}
+			return fmt.Errorf("found '%s' in logs:\n%s", text, s.Out.Contents())
+		}
+	}
 	return nil
 }
 
 var AsyncAssertLogWithTimeout = stepdef.StepDefinition{
 	Name: "it-should-log-duration",
-	Text: "<assertion> <duration> <reference> logs (should|should not) say <text>",
+	Text: "{assertion} {duration} {reference} logs {should|should not} say {text}",
 	Help: `Asserts that the referenced resource will log something within the specified duration`,
 	Examples: `
 		Given a resource called testernetes:
@@ -63,7 +66,7 @@ var AsyncAssertLogWithTimeout = stepdef.StepDefinition{
 
 var AsyncAssertLog = stepdef.StepDefinition{
 	Name: "it-should-log",
-	Text: "<reference> logs (should|should not) say <text>",
+	Text: "{reference} logs {should|should not} say {text}",
 	Help: `Asserts that the referenced resource will log something within the specified duration`,
 	Examples: `
 		Given a resource called testernetes:
@@ -84,8 +87,8 @@ var AsyncAssertLog = stepdef.StepDefinition{
 		  """
 		When I create testernetes
 		Then testernetes logs should say Behaviour Driven Kubernetes`,
-	Function: func(ctx context.Context, ref, not, matcher string, opts *corev1.PodLogOptions) (err error) {
-		return AsyncAssertLogFunc(ctx, "", time.Second, ref, not, matcher, opts)
+	Function: func(ctx context.Context, c gkube.KubernetesHelper, pod *corev1.Pod, desiredMatch bool, text string, opts *corev1.PodLogOptions) (err error) {
+		return AsyncAssertLogFunc(ctx, c, stepdef.Eventually, time.Second, pod, desiredMatch, text, opts)
 	},
 }
 

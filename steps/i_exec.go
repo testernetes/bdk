@@ -4,34 +4,31 @@ import (
 	"context"
 
 	messages "github.com/cucumber/messages/go/v21"
-	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/contextutils"
 	"github.com/testernetes/bdk/stepdef"
+	"github.com/testernetes/bdk/store"
 	"github.com/testernetes/gkube"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var IExecFunc = func(ctx context.Context, c client.Client, cmd []string, pod *corev1.Pod, container string) error {
-	var s *gkube.PodSession
-	Eventually(func() error {
-		var err error
-		s, err = c.Exec(ctx, pod, container, cmd, nil, nil)
-		return err
-	}).WithContext(ctx).Should(Succeed(), "Could not exec in container")
-
-	contextutils.SaveSession(ctx, pod, s)
-
-	return nil
+var IExecFunc = func(ctx context.Context, c gkube.KubernetesHelper, cmd []string, pod *corev1.Pod, container string) error {
+	return clientDo(ctx, func() error {
+		s, err := c.Exec(ctx, pod, container, cmd, nil, nil)
+		if err != nil {
+			return err
+		}
+		store.Save(ctx, client.ObjectKeyFromObject(pod).String(), s)
+		return nil
+	})
 }
 
-var IExecScriptFunc = func(ctx context.Context, ref, container string, script *messages.DocString) error {
+var IExecScriptFunc = func(ctx context.Context, c gkube.KubernetesHelper, pod *corev1.Pod, container string, script *messages.DocString) error {
 	shell := script.MediaType
 	if shell == "" {
 		shell = "/bin/sh"
 	}
 	cmd := script.Content
-	return IExecFunc(ctx, []string{shell, "-c", cmd}, ref, container)
+	return IExecFunc(ctx, c, []string{shell, "-c", cmd}, pod, container)
 }
 
 var IExecInContainer = stepdef.StepDefinition{
@@ -40,8 +37,8 @@ var IExecInContainer = stepdef.StepDefinition{
 	Help: "Executes the given command in a shell in the referenced pod and container.",
 	Examples: `
 	When I exec "echo helloworld" in pod/app`,
-	Function: func(ctx context.Context, cmd string, ref, container string) error {
-		return IExecFunc(ctx, []string{"/bin/sh", "-c", cmd}, ref, container)
+	Function: func(ctx context.Context, c gkube.KubernetesHelper, cmd string, pod *corev1.Pod, container string) error {
+		return IExecFunc(ctx, c, []string{"/bin/sh", "-c", cmd}, pod, container)
 	},
 }
 
@@ -51,8 +48,8 @@ var IExecInDefaultContainer = stepdef.StepDefinition{
 	Help: "Executes the given command in a shell in the referenced pod and default container.",
 	Examples: `
 	When I exec "echo helloworld" in pod`,
-	Function: func(ctx context.Context, cmd, ref string) error {
-		return IExecFunc(ctx, []string{"/bin/sh", "-c", cmd}, ref, "")
+	Function: func(ctx context.Context, c gkube.KubernetesHelper, cmd string, pod *corev1.Pod) error {
+		return IExecFunc(ctx, c, []string{"/bin/sh", "-c", cmd}, pod, "")
 	},
 }
 
@@ -78,7 +75,7 @@ var IExecScriptInDefaultContainer = stepdef.StepDefinition{
 	  """/bin/bash
 	  curl localhost:8080/ready
 	  """`,
-	Function: func(ctx context.Context, ref string, script *messages.DocString) error {
-		return IExecScriptFunc(ctx, ref, "", script)
+	Function: func(ctx context.Context, c gkube.KubernetesHelper, pod *corev1.Pod, script *messages.DocString) error {
+		return IExecScriptFunc(ctx, c, pod, "", script)
 	},
 }

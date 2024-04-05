@@ -3,8 +3,8 @@ package steps
 import (
 	"context"
 
-	. "github.com/onsi/gomega"
 	"github.com/testernetes/bdk/stepdef"
+	"github.com/testernetes/gkube"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -28,7 +28,7 @@ var IDeleteAResource = stepdef.StepDefinition{
 	And I delete cm
 	  | grace period seconds | 30         |
 	  | propagation policy   | Foreground |`,
-	Function: func(ctx context.Context, c client.Client, ref *unstructured.Unstructured, opts []client.DeleteOption) error {
+	Function: func(ctx context.Context, c gkube.KubernetesHelper, ref *unstructured.Unstructured, opts []client.DeleteOption) error {
 		return clientDo(ctx, func() error {
 			return c.Delete(ctx, ref, opts...)
 		})

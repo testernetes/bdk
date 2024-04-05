@@ -7,24 +7,25 @@ import (
 	"github.com/onsi/gomega/types"
 	"github.com/pkg/errors"
 	"github.com/testernetes/bdk/stepdef"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/testernetes/gkube"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/watch"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var AsyncAssertFunc = func(ctx context.Context, cl client.WithWatch, assertion stepdef.Assertion, timeout time.Duration, ref *unstructured.Unstructured, desiredMatch bool, matcher types.GomegaMatcher) (err error) {
-
-	ctx, _ = context.WithTimeout(ctx, timeout)
-
-	i, err := cl.Watch(ctx, ref)
+var AsyncAssertFunc = func(ctx context.Context, c gkube.KubernetesHelper, assert stepdef.Assert, timeout time.Duration, ref *unstructured.Unstructured, jsonpath string, desiredMatch bool, matcher types.GomegaMatcher) (err error) {
+	i, err := c.Watch(ctx, ref)
 	if err != nil {
 		return err
 	}
 	defer i.Stop()
 
-	for {
+	matcher = gkube.HaveJSONPath(jsonpath, matcher)
+
+	retry := true
+	for retry {
 		select {
+		case <-time.After(timeout):
+			return
 		case <-ctx.Done():
 			return
 		case event := <-i.ResultChan():
@@ -36,29 +37,7 @@ var AsyncAssertFunc = func(ctx context.Context, cl client.WithWatch, assertion s
 				err = errors.New(event.Object.(*metav1.Status).String())
 				continue
 			}
-
-			var matches bool
-			matches, err = matcher.Match(event.Object)
-			if err != nil {
-				return err
-			}
-
-			if matches == desiredMatch {
-				if assertion == stepdef.EventuallyAssertion {
-					return nil
-				}
-			}
-
-			if matches != desiredMatch {
-				if desiredMatch {
-					err = errors.New(matcher.FailureMessage(event.Object))
-				} else {
-					err = errors.New(matcher.NegatedFailureMessage(event.Object))
-				}
-				if assertion == stepdef.ConsistentlyAssertion {
-					return err
-				}
-			}
+			retry, err = assert(desiredMatch, matcher, event.Object)
 		}
 	}
 	return nil
@@ -66,7 +45,7 @@ var AsyncAssertFunc = func(ctx context.Context, cl client.WithWatch, assertion s
 
 var AsyncAssertWithTimeout = stepdef.StepDefinition{
 	Name: "it-should-object-duration",
-	Text: "<assertion> <duration> <reference> jsonpath <jsonpath> (should|should not) <matcher>",
+	Text: "{assertion} {duration} {reference} jsonpath {jsonpath} {should|should not} {matcher}",
 	Help: `Asserts that the referenced resource will satisfy the matcher in the specified duration`,
 	Examples: `
 		Given a resource called cm:
@@ -84,7 +63,7 @@ var AsyncAssertWithTimeout = stepdef.StepDefinition{
 
 var AsyncAssert = stepdef.StepDefinition{
 	Name: "it-should-object",
-	Text: "<reference> jsonpath <jsonpath> (should|should not) <matcher>",
+	Text: "{reference} jsonpath {jsonpath} {should|should not} {matcher}",
 	Help: `Asserts that the referenced resource will satisfy the matcher`,
 	Examples: `
 		Given a resource called cm:
@@ -97,7 +76,7 @@ var AsyncAssert = stepdef.StepDefinition{
 		  """
 		And I create cm
 		Then cm jsonpath '{.metadata.uid}' should not be empty`,
-	Function: func(ctx context.Context, ref, jsonpath, not, matcher string) (err error) {
-		return AsyncAssertFunc(ctx, "", time.Second, ref, jsonpath, not, matcher)
+	Function: func(ctx context.Context, c gkube.KubernetesHelper, ref *unstructured.Unstructured, jsonpath string, desiredMatch bool, matcher types.GomegaMatcher) (err error) {
+		return AsyncAssertFunc(ctx, c, stepdef.Eventually, time.Second, ref, jsonpath, desiredMatch, matcher)
 	},
 }

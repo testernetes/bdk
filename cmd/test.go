@@ -23,7 +23,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/testernetes/bdk/formatters"
 	"github.com/testernetes/bdk/model"
-	"github.com/testernetes/bdk/scheme"
+	"github.com/testernetes/bdk/stepdef"
 )
 
 var format string
@@ -48,11 +48,11 @@ func NewTestCommand() *cobra.Command {
 				if err != nil {
 					return errors.New(fmt.Sprintf("could not find a variable called Step in %s", p))
 				}
-				step, ok := v.(*scheme.StepDefinition)
+				step, ok := v.(*stepdef.StepDefinition)
 				if !ok {
 					return errors.New(fmt.Sprintf("expected Step in %s to be a scheme.StepDefinition however it was %T", p, v))
 				}
-				scheme.Default.AddToScheme(*step)
+				model.StepFunctions.Register(*step)
 			}
 
 			gomega.RegisterFailHandler(func(message string, _ ...int) {
@@ -93,7 +93,7 @@ func NewTestCommand() *cobra.Command {
 						return nil
 					}
 
-					feature, err := model.NewFeature(path, gd.Feature, scheme.Default, filter)
+					feature, err := model.NewFeature(path, gd.Feature, filter)
 					if err != nil {
 						return fmt.Errorf("error creating feature from doc: %s\n", err)
 					}

@@ -10,7 +10,7 @@ import (
 	"strconv"
 
 	messages "github.com/cucumber/messages/go/v21"
-	"github.com/testernetes/bdk/contextutils"
+	"github.com/onsi/gomega/types"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
 )
@@ -38,11 +38,46 @@ var (
 	ConsistentlyPhrases = []string{"for at least", "for no less than"}
 )
 
-type Assertion string
+type Assert func(bool, types.GomegaMatcher, any) (bool, error)
+
+func Eventually(desiredMatch bool, matcher types.GomegaMatcher, actual any) (bool, error) {
+	return assert(EventuallyAssertion, desiredMatch, matcher, actual)
+}
+
+func Consistently(desiredMatch bool, matcher types.GomegaMatcher, actual any) (bool, error) {
+	return assert(ConsistentlyAssertion, desiredMatch, matcher, actual)
+}
+
+func assert(assertion assertion, desiredMatch bool, matcher types.GomegaMatcher, actual any) (bool, error) {
+	matches, err := matcher.Match(actual)
+	if err != nil {
+		return false, err
+	}
+
+	if matches == desiredMatch {
+		if assertion == EventuallyAssertion {
+			return false, nil
+		}
+	}
+
+	if matches != desiredMatch {
+		if desiredMatch {
+			err = errors.New(matcher.FailureMessage(actual))
+		} else {
+			err = errors.New(matcher.NegatedFailureMessage(actual))
+		}
+		if assertion == ConsistentlyAssertion {
+			return false, err
+		}
+	}
+	return true, err
+}
+
+type assertion string
 
 const (
-	EventuallyAssertion   Assertion = "Eventually"
-	ConsistentlyAssertion Assertion = "Consistently"
+	EventuallyAssertion   assertion = "Eventually"
+	ConsistentlyAssertion assertion = "Consistently"
 )
 
 var CreateOptions = DataTableArgument{
@@ -51,9 +86,9 @@ var CreateOptions = DataTableArgument{
 	help: `https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client#CreateOptions
 
 		Create Options:
-		| DryRun       | All     |
+		| DryRun       | string  |
 		| FieldManager | string  |`,
-	parser: ParseDataTable,
+	parser: parseClientOptions,
 }
 
 var DeleteOptions = DataTableArgument{
@@ -62,10 +97,37 @@ var DeleteOptions = DataTableArgument{
 	help: `https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client#DeleteOptions
 
 		Delete Options:
-		| DryRun             | All                            |
+		| DryRun             | string                         |
 		| GracePeriodSeconds | number                         |
-		| PropagationPolicy  | (Orphan|Background|Foreground) |`,
-	parser: ParseDataTable,
+		| PropagationPolicy  | {Orphan|Background|Foreground} |`,
+	parser: parseClientOptions,
+}
+
+var DeleteAllOfOptions = DataTableArgument{
+	name:        "Delete All Of Options",
+	description: `(optional) A table of additional client delete all of options.`,
+	help: `https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client#DeleteAllOfOptions
+
+		DeleteAllOf Options:
+		| DryRun             | string                         |
+		| GracePeriodSeconds | number                         |
+		| PropagationPolicy  | (Orphan|Background|Foreground) |
+		| Selector           | string                         |
+		| Namespace          | string                         |
+		| Limit              | number                         |`,
+	parser: parseClientOptions,
+}
+
+var ListOptions = DataTableArgument{
+	name:        "List Options",
+	description: `(optional) A table of additional client list options.`,
+	help: `https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client#ListOptions
+
+		List Options:
+		| Selector  | string |
+		| Namespace | string |
+		| Limit     | number |`,
+	parser: parseClientOptions,
 }
 
 var PatchOptions = DataTableArgument{
@@ -74,16 +136,14 @@ var PatchOptions = DataTableArgument{
 	help: `https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client#PatchOptions
 
 		Patch Options:
-		| DryRun       | All     |
-		| FieldManager | string  |
-		| Force        | boolean |
-
-		| patch         | string (required) |
-		| field manager | string            |`,
-	// TODO
-	parser: ParseDataTable, // might need a custom parser
+		| DryRun       | string |
+		| FieldManager | string |
+		| Force        | string |`,
+	// TODO // require a patch be declared in previous step
+	parser: parseClientOptions,
 }
 
+// TODO
 var PodLogOptions = DataTableArgument{
 	name:        "Pod Log Options",
 	description: `(optional) A table of additional client pod log options.`,
@@ -124,6 +184,48 @@ var ProxyGetOptions = DataTableArgument{
 	},
 }
 
+var Patch = DocStringArgument{
+	name:        "Patch",
+	description: `A patch for a Kubernetes resource.`,
+	help: `https://kubernetes.io/docs/reference/using-api/api-concepts/#patch-and-apply
+
+		JSON Patch:
+		"""application/json-patch+json
+                [
+                	{
+                		"op" : "replace" ,
+                		"path" : "/data/foo" ,
+                		"value" : "nobar"
+                	}
+                ]
+		"""
+
+		Merge Patch
+		"""application/merge-patch+json
+          	{
+	  	  "data": {
+	  	    "foo":"nobar"
+	  	  }
+	  	}
+		"""
+
+		Strategic Patch
+		"""application/strategic-merge-patch+json
+          	{
+	  	  "data": {
+	  	    "foo":"nobar"
+	  	  }
+	  	}
+		"""
+
+		Server-Side Apply
+		"""application/apply-patch+yaml
+	        data:
+	          foo: nobar
+		"""`,
+	parser: parseDocString,
+}
+
 var Manifest = DocStringArgument{
 	name:        "Manifest",
 	description: `A Kubernetes manifest.`,
@@ -162,6 +264,7 @@ func (sp *stringParameters) SubstituteParameters(step string) (expression string
 	expression = re.ReplaceAllStringFunc(step, func(name string) string {
 		for _, p := range *sp {
 			if p.Name() == name {
+				params = append(params, p)
 				return p.Expression()
 			}
 		}
@@ -230,13 +333,7 @@ func init() {
 
 		The reference must a name that can be used as a DNS subdomain name as defined in RFC 1123.
 		This is the same Kubernetes requirement for names, i.e. lowercase alphanumeric characters.`,
-			parser: func(ctx context.Context, ref string, targetType reflect.Type) (reflect.Value, error) {
-				if targetType.AssignableTo(reflect.TypeOf((*unstructured.Unstructured)(nil))) {
-					u := contextutils.LoadObject(ctx, ref)
-					return reflect.ValueOf(u), nil
-				}
-				return reflect.Value{}, nil
-			},
+			parser: StringParsers.Parse,
 		},
 		stringParameter{
 			name:        "{command}",

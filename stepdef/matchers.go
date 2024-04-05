@@ -3,6 +3,7 @@ package stepdef
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -11,7 +12,6 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/onsi/gomega/types"
-	"github.com/testernetes/gkube"
 	"sigs.k8s.io/yaml"
 )
 
@@ -27,6 +27,10 @@ type Matcher struct {
 
 func (m Matcher) GetExpression() *regexp.Regexp {
 	return m.re
+}
+
+func (m Matcher) PrintHelp() string {
+	return "TODO print parameters"
 }
 
 var Matchers = matchers{}
@@ -73,69 +77,64 @@ func (m *matchers) register(matcher Matcher) error {
 	return nil
 }
 
-func (matchers matchers) ParseMatcher(text string) (reflect.Value, error) {
+func (matchers matchers) ParseMatcher(ctx context.Context, text string) (reflect.Value, error) {
+	var matcher Matcher
 	for _, m := range matchers {
-		if !m.GetExpression().MatchString(text) {
+		if m.GetExpression().MatchString(text) {
+			matcher = m
+			break
+		}
+	}
+
+	if matcher.Name == "" {
+		return reflect.Value{}, fmt.Errorf("unrecognised assertion: %s", text)
+	}
+
+	tFunc := reflect.TypeOf(matcher.Func)
+
+	// if reflect Func has args fill them
+	args := []reflect.Value{}
+	submatches := matcher.GetExpression().FindSubmatch([]byte(text))
+	for i := 0; i < tFunc.NumIn(); i++ {
+		submatches = submatches[1:]
+		if len(submatches) == 0 {
+			break
+		}
+		v := submatches[0]
+
+		// This is the last arg.
+		// Split the last submatch into space delimited words and append to args
+		// BeNumericallyThreashold
+		// BeElementOf
+		// ConsistOf
+		if tFunc.IsVariadic() && i == tFunc.NumIn()-1 {
+			words := getWords(v)
+			for _, word := range words {
+				args = append(args, reflect.ValueOf(word))
+			}
+			break
+		}
+
+		targetType := tFunc.In(i)
+		if targetType.Kind() == reflect.String {
+			args = append(args, reflect.ValueOf(string(v)))
 			continue
 		}
-		tFunc := reflect.TypeOf(m.Func)
 
-		// if reflect Func has args fill them
-		args := []reflect.Value{}
-		submatches := m.GetExpression().FindSubmatch([]byte(text))
-		for i := 0; i < tFunc.NumIn(); i++ {
-			submatches = submatches[1:]
-			if len(submatches) == 0 {
-				break
-			}
-			v := submatches[0]
-
-			// This is the last arg.
-			// Split the last submatch into space delimited words and append to args
-			// BeNumericallyThreashold
-			// BeElementOf
-			// ConsistOf
-			if tFunc.IsVariadic() && i == tFunc.NumIn()-1 {
-				words := getWords(v)
-				for _, word := range words {
-					args = append(args, reflect.ValueOf(word))
-				}
-				break
-			}
-
-			targetType := tFunc.In(i)
-			if targetType.Kind() == reflect.String {
-				args = append(args, reflect.ValueOf(string(v)))
-				continue
-			}
-
-			var expected interface{}
-			err := yaml.Unmarshal(v, &expected)
-			if err != nil {
-				return reflect.Value{}, err
-			}
-			args = append(args, reflect.ValueOf(expected))
+		var expected interface{}
+		err := yaml.Unmarshal(v, &expected)
+		if err != nil {
+			return reflect.Value{}, err
 		}
-		ret := reflect.ValueOf(m.Func).Call(args)
-		return ret[0], nil
+		args = append(args, reflect.ValueOf(expected))
 	}
-	return reflect.Value{}, fmt.Errorf("unrecognised assertion: %s", text)
+	ret := reflect.ValueOf(matcher.Func).Call(args)
+	return ret[0], nil
 }
 
 func init() {
 	// Order matters for matching due to anything wildcards
 	Matchers.Register(matchers{
-		{
-			Text: "jsonpath {jsonpath} {matcher}",
-			Help: "Process the jsonpath",
-			Func: func(j, text string) types.GomegaMatcher {
-				m, err := Matchers.ParseMatcher(text)
-				if err != nil {
-					panic(err)
-				}
-				return gkube.HaveJSONPath(j, m.Interface().(types.GomegaMatcher))
-			},
-		},
 		{
 			Name: "be-empty",
 			Text: "be empty",

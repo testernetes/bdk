@@ -1,6 +1,7 @@
 package model
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -9,10 +10,11 @@ import (
 
 	messages "github.com/cucumber/messages/go/v21"
 	"github.com/drone/envsubst"
-	"github.com/testernetes/bdk/contextutils"
+	"github.com/testernetes/bdk/formatters/utils"
 	"github.com/testernetes/bdk/stepdef"
 	"github.com/testernetes/bdk/steps"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"github.com/testernetes/bdk/store"
+	"github.com/testernetes/gkube"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -42,7 +44,7 @@ func init() {
 type stepFunction struct {
 	stepdef.StepDefinition
 
-	function   reflect.Type
+	function   reflect.Value
 	re         *regexp.Regexp
 	parameters []stepdef.StringParameter
 }
@@ -57,8 +59,24 @@ func variableSubstitution(ctx context.Context, s string) (string, error) {
 		return text, err
 	}
 	return envsubst.Eval(text, func(key string) string {
-		return contextutils.LoadVariable(ctx, key)
+		return store.Load[string](ctx, key)
 	})
+}
+
+func (s *stepFunctions) Print(stepName string) string {
+	buf := bytes.NewBufferString("")
+	for _, sf := range *s {
+		if sf.Name == stepName {
+			for _, p := range sf.parameters {
+				// TODO do better printing
+				text := p.Name()
+				fmt.Fprintf(buf, utils.Examples("\n%s:\n"), text)
+				fmt.Fprintf(buf, utils.Parameter(p.Description()))
+				fmt.Fprintf(buf, utils.Parameter(p.Help()))
+			}
+		}
+	}
+	return buf.String()
 }
 
 func (s *stepFunctions) Eval(ctx context.Context, step *messages.Step) *Step {
@@ -113,18 +131,19 @@ func (sf *stepFunctions) register(input stepdef.StepDefinition) (err error) {
 		s.StepArg = stepdef.NoStepArg
 	}
 
-	otherIns := 1 // context.Context
-	if s.StepArg.StepArgType() == stepdef.NoStepArgType {
-		otherIns += 1
-	}
-
 	// validate function and matches regex capture groups
 	s.function, err = processFunction(s.Function)
 	if err != nil {
 		return err
 	}
 
-	if !s.function.In(1).Implements(reflect.TypeOf((*client.Client)(nil)).Elem()) {
+	otherIns := 1 // context.Context
+	if s.StepArg.StepArgType() == stepdef.NoStepArgType {
+		otherIns += 1
+	}
+
+	tFunc := s.function.Type()
+	if !tFunc.In(1).Implements(reflect.TypeOf((*gkube.KubernetesHelper)(nil)).Elem()) {
 		otherIns += 1
 	}
 
@@ -134,11 +153,11 @@ func (sf *stepFunctions) register(input stepdef.StepDefinition) (err error) {
 		return err
 	}
 
-	if s.function.NumIn()-otherIns < len(params) {
+	if tFunc.NumIn()-otherIns < len(params) {
 		return ErrTooFewArguments
 	}
 
-	if s.function.NumIn()-otherIns > len(params) {
+	if tFunc.NumIn()-otherIns > len(params) {
 		return ErrTooManyArguments
 	}
 
@@ -157,35 +176,35 @@ func (sf *stepFunctions) register(input stepdef.StepDefinition) (err error) {
 // * Function is a function
 // * Function only returns an error
 // * Function accepts context as its first arugment
-func processFunction(fn any) (reflect.Type, error) {
+func processFunction(fn any) (reflect.Value, error) {
 	if fn == nil {
-		return nil, ErrStepDefinitionMustHaveFunc
+		return reflect.Value{}, ErrStepDefinitionMustHaveFunc
 	}
 	vFunc := reflect.ValueOf(fn)
 
 	if vFunc.Kind() != reflect.Func {
-		return nil, ErrStepDefinitionMustHaveFunc
+		return vFunc, ErrStepDefinitionMustHaveFunc
 	}
 
 	tFunc := vFunc.Type()
 
 	// returns an error
 	if tFunc.NumOut() != 1 {
-		return nil, ErrMustHaveErrReturn
+		return vFunc, ErrMustHaveErrReturn
 	}
 	if !tFunc.Out(0).Implements(reflect.TypeOf((*error)(nil)).Elem()) {
-		return nil, ErrMustHaveErrReturn
+		return vFunc, ErrMustHaveErrReturn
 	}
 
 	// first parameter is context
 	if tFunc.NumIn() < 1 {
-		return nil, ErrMustHaveContext
+		return vFunc, ErrMustHaveContext
 	}
 	if !tFunc.In(0).Implements(reflect.TypeOf((*context.Context)(nil)).Elem()) {
-		return nil, ErrMustHaveContext
+		return vFunc, ErrMustHaveContext
 	}
 
-	return tFunc, nil
+	return vFunc, nil
 }
 
 func (sf stepFunction) Matches(ctx context.Context, step *messages.Step) (*Step, bool) {
@@ -208,29 +227,31 @@ func (sf stepFunction) GetRunner(ctx context.Context, step *messages.Step) (*Ste
 		Text:        step.Text,
 		Args:        []reflect.Value{reflect.ValueOf(ctx)},
 	}
-	otherIns := 1
 
-	if sf.function.In(1).Implements(reflect.TypeOf((*client.Client)(nil)).Elem()) {
-		runner.Args = append(runner.Args, reflect.ValueOf(contextutils.MustGetClientFrom(ctx)))
-		otherIns += 1
+	argOffset := 1
+	tFunc := sf.function.Type()
+
+	targetType := tFunc.In(argOffset)
+	if targetType == reflect.TypeOf((*gkube.KubernetesHelper)(nil)) {
+		client := store.Load[gkube.KubernetesHelper](ctx, "client")
+		runner.Args = append(runner.Args, reflect.ValueOf(client))
+		argOffset += 1
 	}
 
 	captureGroups := sf.re.FindStringSubmatch(step.Text)[1:]
+	for i, p := range sf.parameters {
+		value := captureGroups[i]
+		targetType := tFunc.In(argOffset + i)
 
-	// Parse regexp capture groups
-	for i, stringValue := range captureGroups {
-		targetType := sf.function.In(i + otherIns)
-		p := sf.parameters[i]
-
-		arg, err := p.Parse(ctx, stringValue, targetType)
+		arg, err := p.Parse(ctx, value, targetType)
 		if err != nil {
-			return nil, fmt.Errorf("cannot parse parameter %d: %w", i, err)
+			return nil, fmt.Errorf("cannot parse parameter %d with value %s into type %s: %w", i, value, targetType.String(), err)
 		}
 		runner.Args = append(runner.Args, arg)
 	}
 
 	if sf.StepArg.StepArgType() != stepdef.NoStepArgType {
-		targetType := sf.function.In(sf.function.NumIn() - 1)
+		targetType := tFunc.In(tFunc.NumIn() - 1)
 		arg, err := sf.StepArg.Parse(ctx, step, targetType)
 		if err != nil {
 			return nil, fmt.Errorf("cannot parse step arg: %w", err)

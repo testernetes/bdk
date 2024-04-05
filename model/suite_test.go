@@ -1,4 +1,4 @@
-package scheme_test
+package model
 
 import (
 	"testing"

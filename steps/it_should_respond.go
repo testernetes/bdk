@@ -2,22 +2,32 @@ package steps
 
 import (
 	"context"
+	"fmt"
 	"time"
 
-	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/contextutils"
 	"github.com/testernetes/bdk/stepdef"
+	"github.com/testernetes/gkube"
 )
 
-var AsyncAssertRespFunc = func(ctx context.Context, phrase string, timeout time.Duration, ref, not, matcher string) (err error) {
-	session := contextutils.LoadSession(ctx, ref)
-	Expect(session).ShouldNot(BeNil(), ErrNoResource, ref)
+var AsyncAssertRespFunc = func(ctx context.Context, c gkube.KubernetesHelper, assert stepdef.Assert, timeout time.Duration, s gkube.PodSession, desiredMatch bool, text string) (err error) {
+	defer s.Out.CancelDetects()
 
-	matcher = "say " + matcher
-
-	NewStringAsyncAssertion(phrase, session).
-		WithContext(ctx, timeout).
-		ShouldOrShouldNot(not, matcher)
+	retry := true
+	for retry {
+		select {
+		case <-time.After(timeout):
+			if desiredMatch {
+				return fmt.Errorf("did not find '%s' in logs:\n%s", text, s.Out.Contents())
+			}
+		case <-ctx.Done():
+			return
+		case <-s.Buffer().Detect(text):
+			if desiredMatch {
+				return nil
+			}
+			return fmt.Errorf("found '%s' in logs:\n%s", text, s.Out.Contents())
+		}
+	}
 
 	return nil
 }
@@ -73,7 +83,7 @@ var AsyncAssertResp = stepdef.StepDefinition{
 		When I create my-api
 		And I proxy get http://my-app:8000/fake
 		Then within 30s my-api response should say hello`,
-	Function: func(ctx context.Context, ref, not, matcher string) (err error) {
-		return AsyncAssertRespFunc(ctx, "", time.Second, ref, not, matcher)
+	Function: func(ctx context.Context, c gkube.KubernetesHelper, ref gkube.PodSession, desiredMatch bool, text string) (err error) {
+		return AsyncAssertRespFunc(ctx, c, stepdef.Eventually, time.Second, ref, desiredMatch, text)
 	},
 }

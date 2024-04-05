@@ -2,60 +2,44 @@ package steps
 
 import (
 	"context"
-	"fmt"
-	"regexp"
-	"time"
 
-	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/contextutils"
-	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/scheme"
+	"github.com/testernetes/bdk/stepdef"
+	"github.com/testernetes/bdk/store"
 	"github.com/testernetes/gkube"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func init() {
-	scheme.Default.MustAddToScheme(IProxyGet)
-}
+var IProxyGetFunc = func(ctx context.Context, c gkube.KubernetesHelper, scheme string, ref *unstructured.Unstructured, port, path string, params map[string]string) error {
 
-var IProxyGetFunc = func(ctx context.Context, scheme, ref, port, path string, params map[string]string) error {
-	u := contextutils.LoadObject(ctx, ref)
-	Expect(u).ShouldNot(BeNil(), ErrNoResource, ref)
-
-	var o client.Object
-	switch u.GetObjectKind().GroupVersionKind().Kind {
+	switch ref.GetObjectKind().GroupVersionKind().Kind {
 	case "Pod":
 		pod := &corev1.Pod{}
-		err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), pod)
+		err := runtime.DefaultUnstructuredConverter.FromUnstructured(ref.UnstructuredContent(), pod)
 		if err != nil {
 			panic(err)
 		}
-		o = pod
 	case "Service":
 		service := &corev1.Service{}
-		err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), service)
+		err := runtime.DefaultUnstructuredConverter.FromUnstructured(ref.UnstructuredContent(), service)
 		if err != nil {
 			panic(err)
 		}
-		o = service
 	}
 
-	var s *gkube.PodSession
-	c := contextutils.MustGetClientFrom(ctx)
-	Eventually(func() error {
-		var err error
-		s, err = c.ProxyGet(ctx, o, scheme, port, path, params, nil, nil)
+	s, err := c.ProxyGet(ctx, ref, scheme, port, path, params, nil, nil)
+	if err != nil {
 		return err
-	}).WithTimeout(time.Minute).Should(Succeed(), "Failed to proxy get")
+	}
 
-	contextutils.SaveSession(ctx, ref, s)
+	store.Save(ctx, client.ObjectKeyFromObject(ref).String(), s)
 
 	return nil
 }
 
-var IProxyGet = scheme.StepDefinition{
+var IProxyGet = stepdef.StepDefinition{
 	Name: "i-proxy-get",
 	Text: "I proxy get <scheme>://<reference>:<port><path>",
 	Help: `Create a proxy connection to the referenced pod resource and attempts a http(s) GET for the port and path.
@@ -79,14 +63,12 @@ var IProxyGet = scheme.StepDefinition{
 	And within 1m pod jsonpath '{.status.phase}' should equal Running
 	And I proxy get http://app:8000/fake
 	Then pod response code should equal 404`,
-	Parameters: []parameters.Parameter{parameters.URLScheme, parameters.Reference, parameters.Port, parameters.URLPath, parameters.ProxyGetOptions},
-	Function:   IProxyGetFunc,
+	Function: IProxyGetFunc,
 }
 
-var IProxyGetHTTP = scheme.StepDefinition{
-	Expression: regexp.MustCompile(fmt.Sprintf(`^I proxy get %s%s%s$`, NamedObj, Port, URLPath)),
-	Function: func(ctx context.Context, ref, port, path string, options map[string]string) error {
-		return IProxyGetFunc(ctx, "", ref, port, path, options)
+var IProxyGetHTTP = stepdef.StepDefinition{
+	Function: func(ctx context.Context, c gkube.KubernetesHelper, ref *unstructured.Unstructured, port, path string, options map[string]string) error {
+		return IProxyGetFunc(ctx, c, "", ref, port, path, options)
 	},
 	Name: "i-proxy-get",
 	Text: "I proxy get <reference>:<port><path>",
