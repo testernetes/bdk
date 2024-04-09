@@ -12,9 +12,7 @@ import (
 	"github.com/drone/envsubst"
 	"github.com/testernetes/bdk/formatters/utils"
 	"github.com/testernetes/bdk/stepdef"
-	"github.com/testernetes/bdk/steps"
 	"github.com/testernetes/bdk/store"
-	"github.com/testernetes/gkube"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -36,12 +34,12 @@ var (
 	ErrFuncArgsMustMatchParams     = errors.New("cannot convert parameter into function argument")
 )
 
-func init() {
-	StepFunctions.Register(
-		steps.AResource,
-		steps.AResourceFromFile,
-	)
-}
+//func init() {
+//	StepFunctions.Register(
+//		steps.AResource,
+//		steps.AResourceFromFile,
+//	)
+//}
 
 type stepFunction struct {
 	stepdef.StepDefinition
@@ -91,12 +89,14 @@ func (s *stepFunctions) Eval(ctx context.Context, step *messages.Step) *Step {
 		step.Text = text
 	}
 
-	ds, err := variableSubstitution(ctx, step.DocString.Content)
-	if err != nil {
-		log.FromContext(ctx).Error(err, "docstring: could not substitute from environment variables")
-	}
-	if ds != "" {
-		step.DocString.Content = ds
+	if step.DocString != nil {
+		ds, err := variableSubstitution(ctx, step.DocString.Content)
+		if err != nil {
+			log.FromContext(ctx).Error(err, "docstring: could not substitute from environment variables")
+		}
+		if ds != "" {
+			step.DocString.Content = ds
+		}
 	}
 
 	// TODO datatable replacement
@@ -104,6 +104,8 @@ func (s *stepFunctions) Eval(ctx context.Context, step *messages.Step) *Step {
 	for _, sd := range *s {
 		if stepRunner, match := sd.Matches(ctx, step); match {
 			return stepRunner
+		} else {
+			panic("2kjkj")
 		}
 	}
 	return nil
@@ -114,6 +116,7 @@ func (sf *stepFunctions) Register(stepDefs ...stepdef.StepDefinition) {
 	for _, s := range stepDefs {
 		err := sf.register(s)
 		if err != nil {
+			fmt.Printf("%+v", s)
 			panic(err)
 		}
 	}
@@ -124,10 +127,10 @@ func (sf *stepFunctions) register(input stepdef.StepDefinition) (err error) {
 		StepDefinition: input,
 	}
 	if s.Text == "" {
-		panic(ErrMustHaveText)
+		return ErrMustHaveText
 	}
 	if s.Name == "" {
-		panic(ErrMustHaveName)
+		return ErrMustHaveName
 	}
 	if s.StepArg == nil {
 		s.StepArg = stepdef.NoStepArg
@@ -140,14 +143,16 @@ func (sf *stepFunctions) register(input stepdef.StepDefinition) (err error) {
 	}
 
 	otherIns := 1 // context.Context
-	if s.StepArg.StepArgType() == stepdef.NoStepArgType {
+	if s.StepArg.StepArgType() != stepdef.NoStepArgType {
 		otherIns += 1
 	}
 
 	tFunc := s.function.Type()
-	switch tFunc.In(1) {
-	case reflect.TypeOf((client.WithWatch)(nil)), reflect.TypeOf(kubernetes.Clientset{}):
-		otherIns += 1
+	if tFunc.NumIn() > 1 {
+		switch tFunc.In(1) {
+		case reflect.TypeOf((client.WithWatch)(nil)), reflect.TypeOf(kubernetes.Clientset{}):
+			otherIns += 1
+		}
 	}
 
 	// validate parameters and check matches regex capture groups and replace text with regex
@@ -163,6 +168,8 @@ func (sf *stepFunctions) register(input stepdef.StepDefinition) (err error) {
 	if tFunc.NumIn()-otherIns > len(params) {
 		return ErrTooManyArguments
 	}
+
+	s.parameters = params
 
 	// validate text and regex
 	s.re, err = regexp.Compile(newText)
@@ -216,9 +223,9 @@ func (sf stepFunction) Matches(ctx context.Context, step *messages.Step) (*Step,
 	}
 	stepRunner, err := sf.GetRunner(ctx, step)
 	if err != nil {
-		return stepRunner, true
+		panic("dfd")
 	}
-	return nil, true
+	return stepRunner, true
 }
 
 // instanciate a stepdefinition given a step
@@ -237,9 +244,10 @@ func (sf stepFunction) GetRunner(ctx context.Context, step *messages.Step) (*Ste
 	argOffset := 1
 	tFunc := sf.function.Type()
 
+	// TODO add the clients in
 	targetType := tFunc.In(argOffset)
-	if targetType == reflect.TypeOf((*gkube.KubernetesHelper)(nil)) {
-		client := store.Load[gkube.KubernetesHelper](ctx, "client")
+	if targetType == reflect.TypeOf((*client.WithWatch)(nil)) {
+		client := store.Load[client.WithWatch](ctx, "client")
 		runner.Args = append(runner.Args, reflect.ValueOf(client))
 		argOffset += 1
 	}

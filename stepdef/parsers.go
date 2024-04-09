@@ -13,7 +13,6 @@ import (
 	messages "github.com/cucumber/messages/go/v21"
 	"github.com/onsi/gomega/types"
 	"github.com/testernetes/bdk/store"
-	"github.com/testernetes/gkube"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -69,10 +68,15 @@ func ParseDataTable(ctx context.Context, dt *messages.DataTable, targetType refl
 type stringParsers map[reflect.Type]func(context.Context, string) (reflect.Value, error)
 
 func (p stringParsers) Parse(ctx context.Context, s string, t reflect.Type) (reflect.Value, error) {
+	if t == nil {
+		return reflect.Value{}, fmt.Errorf("target type cannot be nil")
+	}
+
 	parser, supportedType := p[t]
 	if !supportedType {
 		return reflect.Value{}, fmt.Errorf("No supported parser registered for %s", t)
 	}
+	//fmt.Printf("%s to %T", t.String(), parser)
 	return parser(ctx, s)
 }
 
@@ -94,8 +98,7 @@ var StringParsers = stringParsers{
 	reflect.TypeOf(time.Duration(0)):                  parseGeneric(time.ParseDuration),
 	reflect.TypeOf((*unstructured.Unstructured)(nil)): loadFromStore[*unstructured.Unstructured](),
 	reflect.TypeOf((*corev1.Pod)(nil)):                parsePod,
-	reflect.TypeOf(gkube.PodSession{}):                loadFromStore[gkube.PodSession](),
-	reflect.TypeOf((types.GomegaMatcher)(nil)):        Matchers.ParseMatcher,
+	reflect.TypeOf((*types.GomegaMatcher)(nil)):       Matchers.ParseMatcher,
 
 	reflect.TypeOf(client.DryRunAll):                valueIfTrue(client.DryRunAll),
 	reflect.TypeOf(client.FieldOwner("")):           unmarshal[client.FieldOwner],
@@ -224,7 +227,7 @@ func parseBool(ctx context.Context, s string) (reflect.Value, error) {
 func parsePod(ctx context.Context, s string) (reflect.Value, error) {
 	u := store.Load[*unstructured.Unstructured](ctx, s)
 	pod := &corev1.Pod{}
-	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, pod)
+	err := runtime.DefaultUnstructuredConverter.FromUnstructuredWithValidation(u.Object, pod, false)
 	if err != nil {
 		return reflect.Value{}, err
 	}
@@ -233,8 +236,7 @@ func parsePod(ctx context.Context, s string) (reflect.Value, error) {
 
 func loadFromStore[T any]() func(context.Context, string) (reflect.Value, error) {
 	return func(ctx context.Context, s string) (reflect.Value, error) {
-		u := store.Load[T](ctx, s)
-		return reflect.ValueOf(u), nil
+		return reflect.ValueOf(store.Load[T](ctx, s)), nil
 	}
 }
 
@@ -318,10 +320,10 @@ func parseFloat32(ctx context.Context, input string) (reflect.Value, error) {
 
 func parseAssertion(ctx context.Context, phrase string) (reflect.Value, error) {
 	if contains(phrase, EventuallyPhrases) {
-		return reflect.ValueOf(EventuallyAssertion), nil
+		return reflect.ValueOf(Eventually), nil
 	}
 	if contains(phrase, ConsistentlyPhrases) {
-		return reflect.ValueOf(ConsistentlyAssertion), nil
+		return reflect.ValueOf(Consistently), nil
 	}
 	return reflect.Value{}, errors.New("cannot determine if eventually or consistently")
 }

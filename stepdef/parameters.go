@@ -35,7 +35,7 @@ const (
 
 var (
 	EventuallyPhrases   = []string{"", "within", "in less than", "in under", "in no more than"}
-	ConsistentlyPhrases = []string{"for at least", "for no less than"}
+	ConsistentlyPhrases = []string{"for", "for at least", "for no less than"}
 )
 
 type Assert func(bool, types.GomegaMatcher, any) (bool, error)
@@ -286,6 +286,7 @@ func (sp *stringParameters) register(p StringParameter) {
 			panic("a parameter with the same name already exists")
 		}
 	}
+	*sp = append(*sp, p)
 }
 
 func init() {
@@ -459,33 +460,3 @@ func init() {
 		},
 	)
 }
-
-//var OutWriter = stringParameter{
-//		expression: RFC1123,
-//		description:  `A writer`,
-//		help: `Where to write an out stream
-//		Options:
-//		  - stdout
-//		  - stdin
-//		  - file:<path>
-//		  - null
-//		`,
-//	},
-//	Text:   "<out>",
-//	parser: ParseWriter,
-//}
-//
-//var ErrWriter = stringParameter{
-//		expression: RFC1123,
-//		description:  `A writer`,
-//		help: `Where to write an err stream
-//		Options:
-//		  - stdout
-//		  - stdin
-//		  - file:<path>
-//		  - null
-//		`,
-//	},
-//	Text:   "<err>",
-//	parser: ParseWriter,
-//}

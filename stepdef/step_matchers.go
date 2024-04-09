@@ -52,7 +52,6 @@ func (m *matchers) register(matcher Matcher) error {
 		return errors.New(fmt.Sprintf("matcher '%s' has invalid Func", matcher.Text))
 	}
 
-	// panic if it doesn't return types.GomegaMatcher
 	if tFunc.NumOut() != 1 {
 		return errors.New(fmt.Sprintf("matcher '%s' does not return 1 value", matcher.Text))
 	}
@@ -77,9 +76,9 @@ func (m *matchers) register(matcher Matcher) error {
 	return nil
 }
 
-func (matchers matchers) ParseMatcher(ctx context.Context, text string) (reflect.Value, error) {
+func (matchers *matchers) ParseMatcher(ctx context.Context, text string) (reflect.Value, error) {
 	var matcher Matcher
-	for _, m := range matchers {
+	for _, m := range *matchers {
 		if m.GetExpression().MatchString(text) {
 			matcher = m
 			break
@@ -87,7 +86,7 @@ func (matchers matchers) ParseMatcher(ctx context.Context, text string) (reflect
 	}
 
 	if matcher.Name == "" {
-		return reflect.Value{}, fmt.Errorf("unrecognised assertion: %s", text)
+		return reflect.Value{}, fmt.Errorf("unrecognised matcher assertion: %s", text)
 	}
 
 	tFunc := reflect.TypeOf(matcher.Func)
@@ -116,17 +115,17 @@ func (matchers matchers) ParseMatcher(ctx context.Context, text string) (reflect
 		}
 
 		targetType := tFunc.In(i)
-		if targetType.Kind() == reflect.String {
+		if targetType.Kind() == reflect.String || targetType.Kind() == reflect.Interface {
 			args = append(args, reflect.ValueOf(string(v)))
 			continue
 		}
 
-		var expected interface{}
-		err := yaml.Unmarshal(v, &expected)
+		value := reflect.New(targetType)
+		err := yaml.Unmarshal(v, value.Interface())
 		if err != nil {
 			return reflect.Value{}, err
 		}
-		args = append(args, reflect.ValueOf(expected))
+		args = append(args, reflect.Indirect(value))
 	}
 	ret := reflect.ValueOf(matcher.Func).Call(args)
 	return ret[0], nil
@@ -161,7 +160,7 @@ func init() {
 		},
 		{
 			Name: "len",
-			Text: "have len {number}",
+			Text: "have length {number}",
 			Help: "Matches if the length equals expected.",
 			Func: gomega.HaveLen,
 		},

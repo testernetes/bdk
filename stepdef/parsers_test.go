@@ -1,35 +1,85 @@
-package stepdef
+package stepdef_test
 
 import (
+	"context"
 	"reflect"
-	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
+	"github.com/onsi/gomega/types"
+	"github.com/testernetes/bdk/stepdef"
+	"github.com/testernetes/bdk/store"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var _ = Describe("Parser", func() {
-	DescribeTable("Parsing a StringParameter match",
-		func(p StringParameter, match string, t reflect.Type, expected interface{}) {
-			val, err := p.Parser(match, t)
+var (
+	tString = reflect.TypeOf("")
+	tInt    = reflect.TypeOf(0)
+	tBool   = reflect.TypeOf(false)
+	tFloat  = reflect.TypeOf(0.1)
+
+	tMatcher      = reflect.TypeOf((*types.GomegaMatcher)(nil))
+	tAssert       = reflect.TypeOf((stepdef.Assert)(nil))
+	tDuration     = reflect.TypeOf(time.Duration(0))
+	tUnstructured = reflect.TypeOf((*unstructured.Unstructured)(nil))
+	tPod          = reflect.TypeOf((*corev1.Pod)(nil))
+
+	tClientDryRun = reflect.TypeOf(client.DryRunAll)
+)
+
+var u = &unstructured.Unstructured{}
+var pod = &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "my-pod"}}
+
+var _ = Describe("StringParser", Ordered, func() {
+	var (
+		ctxWithNoStore = context.Background()
+		ctxWithStore   = store.NewStoreFor(context.Background())
+	)
+
+	BeforeAll(func() {
+		u.SetName("my-pod")
+		store.Save(ctxWithStore, "my-ref", u)
+	})
+
+	DescribeTable("Parsing a string into a given type",
+		func(ctx context.Context, input string, t reflect.Type, expected any) {
+			value, err := stepdef.StringParsers.Parse(ctx, input, t)
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(val.Interface()).Should(Equal(expected))
+
+			switch reflect.TypeOf(expected).Kind() {
+			case reflect.Func:
+				Expect(value.Pointer()).Should(Equal(reflect.ValueOf(expected).Pointer()))
+			default:
+				Expect(value.Interface()).Should(Equal(expected))
+			}
 		},
-		Entry("Text Parser", Text, "word", reflect.TypeOf(""), "word"),
-		Entry("Number Parser", Number, "47", reflect.TypeOf(1), 47),
-		//Entry("Number Parser", Number, "47", int(47)),
-		//Entry("When arg is a int", "a 47", 47, func(ctx context.Context, a int) error { return nil }),
-		//Entry("When arg is a int8", "a 8", int8(8), func(ctx context.Context, a int8) error { return nil }),
-		//Entry("When arg is a int16", "a 16", int16(16), func(ctx context.Context, a int16) error { return nil }),
-		//Entry("When arg is a int32", "a 32", int32(32), func(ctx context.Context, a int32) error { return nil }),
-		//Entry("When arg is a int64", "a 64", int64(64), func(ctx context.Context, a int64) error { return nil }),
-		//Entry("When arg is a float32", "a 3.2", float32(3.2), func(ctx context.Context, a float32) error { return nil }),
-		//Entry("When arg is a float64", "a 6.4", float64(6.4), func(ctx context.Context, a float64) error { return nil }),
-		//Entry("When arg is a []byte", "a bytes", []byte("bytes"), func(ctx context.Context, a []byte) error { return nil }),
+		Entry("Text Parser", ctxWithNoStore, "word", tString, "word"),
+		Entry("Number Parser", ctxWithNoStore, "47", tInt, 47),
+		Entry("Number Parser", ctxWithNoStore, "4.7", tFloat, 4.7),
+
+		Entry("Boolean", ctxWithNoStore, "true", tBool, true),
+		Entry("Boolean", ctxWithNoStore, "false", tBool, false),
+		Entry("Boolean", ctxWithNoStore, "", tBool, false),
+
+		Entry("Assert", ctxWithNoStore, "within", tAssert, stepdef.Eventually),
+		Entry("Assert", ctxWithNoStore, "for at least", tAssert, stepdef.Consistently),
+
+		Entry("Duration", ctxWithNoStore, "10s", tDuration, 10*time.Second),
+
+		Entry("Unstructured", ctxWithStore, "my-ref", tUnstructured, u),
+		Entry("Pod", ctxWithStore, "my-ref", tPod, pod),
+
+		Entry("Matcher", ctxWithNoStore, "equal bar", tMatcher, BeEquivalentTo("bar")),
+		Entry("Matcher", ctxWithNoStore, "be empty", tMatcher, BeEmpty()),
+		Entry("Matcher", ctxWithNoStore, "have length 5", tMatcher, HaveLen(5)),
+		Entry("Matcher", ctxWithNoStore, "say helloworld", tMatcher, gbytes.Say("helloworld")),
+
+		Entry("ClientOption", ctxWithNoStore, "true", tClientDryRun, client.DryRunAll),
+		Entry("ClientOption", ctxWithNoStore, "false", tClientDryRun, client.DryRunAll),
 	)
 })
-
-func TestScheme(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "Scheme Suite")
-}

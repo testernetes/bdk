@@ -1,4 +1,4 @@
-package stepdef
+package stepdef_test
 
 import (
 	"testing"
