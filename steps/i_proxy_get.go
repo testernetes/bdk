@@ -2,39 +2,42 @@ package steps
 
 import (
 	"context"
+	"fmt"
+	"io"
 
+	"github.com/onsi/gomega/gbytes"
 	"github.com/testernetes/bdk/stepdef"
 	"github.com/testernetes/bdk/store"
-	"github.com/testernetes/gkube"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var IProxyGetFunc = func(ctx context.Context, c gkube.KubernetesHelper, scheme string, ref *unstructured.Unstructured, port, path string, params map[string]string) error {
-
-	switch ref.GetObjectKind().GroupVersionKind().Kind {
-	case "Pod":
-		pod := &corev1.Pod{}
-		err := runtime.DefaultUnstructuredConverter.FromUnstructured(ref.UnstructuredContent(), pod)
-		if err != nil {
-			panic(err)
-		}
-	case "Service":
-		service := &corev1.Service{}
-		err := runtime.DefaultUnstructuredConverter.FromUnstructured(ref.UnstructuredContent(), service)
-		if err != nil {
-			panic(err)
-		}
+var IProxyGetFunc = func(ctx context.Context, c kubernetes.Clientset, scheme string, obj *unstructured.Unstructured, port, path string, params map[string]string) (err error) {
+	session := &PodSession{
+		Out: gbytes.NewBuffer(),
 	}
+	var stream io.ReadCloser
 
-	s, err := c.ProxyGet(ctx, ref, scheme, port, path, params, nil, nil)
+	switch obj.GetObjectKind().GroupVersionKind().Kind {
+	case "Pod":
+		stream, err = c.CoreV1().
+			Pods(obj.GetNamespace()).ProxyGet(scheme, obj.GetName(), port, path, params).
+			Stream(ctx)
+	case "Service":
+		stream, err = c.CoreV1().
+			Services(obj.GetNamespace()).ProxyGet(scheme, obj.GetName(), port, path, params).
+			Stream(ctx)
+	default:
+		return fmt.Errorf("expected a Pod or Service, got %T", obj)
+	}
 	if err != nil {
 		return err
 	}
 
-	store.Save(ctx, client.ObjectKeyFromObject(ref).String(), s)
+	_, err = io.Copy(session.Out, stream)
+
+	store.Save(ctx, client.ObjectKeyFromObject(obj).String(), session)
 
 	return nil
 }
@@ -67,7 +70,7 @@ var IProxyGet = stepdef.StepDefinition{
 }
 
 var IProxyGetHTTP = stepdef.StepDefinition{
-	Function: func(ctx context.Context, c gkube.KubernetesHelper, ref *unstructured.Unstructured, port, path string, options map[string]string) error {
+	Function: func(ctx context.Context, c kubernetes.Clientset, ref *unstructured.Unstructured, port, path string, options map[string]string) error {
 		return IProxyGetFunc(ctx, c, "", ref, port, path, options)
 	},
 	Name: "i-proxy-get",

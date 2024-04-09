@@ -56,10 +56,10 @@ func (p Printer) StartFeature(feature *model.Feature) {
 }
 
 func (p Printer) FinishScenario(feature *model.Feature, scenario *model.Scenario) {
-	p.scenario(scenario)
-	for _, step := range scenario.Steps {
-		p.step(step)
-	}
+	//p.scenario(scenario)
+	//for _, step := range scenario.Steps {
+	//	p.step(step)
+	//}
 }
 
 func (p Printer) StartScenario(feature *model.Feature, scenario *model.Scenario) {}

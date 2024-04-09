@@ -27,23 +27,9 @@ var ICreateAResource = stepdef.StepDefinition{
 	  | field manager | example |
 	Then within 1s cm jsonpath '{.metadata.uid}' should not be empty`,
 	StepArg: stepdef.CreateOptions,
-	Function: func(ctx context.Context, c client.Client, reference *unstructured.Unstructured, opts []client.CreateOption) (err error) {
-		return clientDo(ctx, func() error {
+	Function: func(ctx context.Context, c client.WithWatch, reference *unstructured.Unstructured, opts []client.CreateOption) (err error) {
+		return withRetry(ctx, func() error {
 			return c.Create(ctx, reference, opts...)
 		})
 	},
-}
-
-func clientDo(ctx context.Context, f func() error) (err error) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			err = f()
-			if err == nil {
-				return nil
-			}
-		}
-	}
 }

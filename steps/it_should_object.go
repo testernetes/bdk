@@ -8,11 +8,13 @@ import (
 	"github.com/pkg/errors"
 	"github.com/testernetes/bdk/stepdef"
 	"github.com/testernetes/gkube"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/watch"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var AsyncAssertFunc = func(ctx context.Context, c gkube.KubernetesHelper, assert stepdef.Assert, timeout time.Duration, ref *unstructured.Unstructured, jsonpath string, desiredMatch bool, matcher types.GomegaMatcher) (err error) {
+var AsyncAssertFunc = func(ctx context.Context, c client.WithWatch, assert stepdef.Assert, timeout time.Duration, ref *unstructured.Unstructured, jsonpath string, desiredMatch bool, matcher types.GomegaMatcher) (err error) {
 	i, err := c.Watch(ctx, ref)
 	if err != nil {
 		return err
@@ -76,7 +78,7 @@ var AsyncAssert = stepdef.StepDefinition{
 		  """
 		And I create cm
 		Then cm jsonpath '{.metadata.uid}' should not be empty`,
-	Function: func(ctx context.Context, c gkube.KubernetesHelper, ref *unstructured.Unstructured, jsonpath string, desiredMatch bool, matcher types.GomegaMatcher) (err error) {
+	Function: func(ctx context.Context, c client.WithWatch, ref *unstructured.Unstructured, jsonpath string, desiredMatch bool, matcher types.GomegaMatcher) (err error) {
 		return AsyncAssertFunc(ctx, c, stepdef.Eventually, time.Second, ref, jsonpath, desiredMatch, matcher)
 	},
 }

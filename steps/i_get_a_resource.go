@@ -16,8 +16,8 @@ var IGetAResource = stepdef.StepDefinition{
 	Given a cm from file blah.yaml
 	And I get cm
 	Then cm jsonpath '{.metadata.uid}' should not be empty`,
-	Function: func(ctx context.Context, c client.Client, ref *unstructured.Unstructured) error {
-		return clientDo(ctx, func() error {
+	Function: func(ctx context.Context, c client.WithWatch, ref *unstructured.Unstructured) error {
+		return withRetry(ctx, func() error {
 			return c.Get(ctx, client.ObjectKeyFromObject(ref), ref)
 		})
 	},

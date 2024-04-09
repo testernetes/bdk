@@ -4,8 +4,9 @@ import (
 	"context"
 
 	"github.com/testernetes/bdk/stepdef"
-	"github.com/testernetes/gkube"
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -16,9 +17,21 @@ var IEvict = stepdef.StepDefinition{
 	Examples: `
 	When I evict pod
 	  | grace period seconds | 120 |`,
-	Function: func(ctx context.Context, c gkube.KubernetesHelper, ref *corev1.Pod, opts []client.DeleteOption) (err error) {
-		return clientDo(ctx, func() error {
-			return c.Evict(ctx, ref, opts...)
+	Function: func(ctx context.Context, c client.WithWatch, pod *corev1.Pod, opts []client.DeleteOption) (err error) {
+		deleteOptions := &client.DeleteOptions{}
+		for _, opt := range opts {
+			opt.ApplyToDelete(deleteOptions)
+		}
+
+		eviction := &policyv1.Eviction{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: pod.Name,
+			},
+			DeleteOptions: deleteOptions.AsDeleteOptions(),
+		}
+
+		return withRetry(ctx, func() error {
+			return c.SubResource("eviction").Create(ctx, pod, eviction)
 		})
 	},
 }

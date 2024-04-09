@@ -12,23 +12,10 @@ import (
 	messages "github.com/cucumber/messages/go/v21"
 )
 
-//        Unspecified,
-//        Context,
-//        Action,
-//        Outcome,
-//        Conjunction,
-//        Unknown
-
 type Step struct {
-	// Should these if templated by hydrated? yes, (maybe not if inject from previous step?)
-	Location    *messages.Location       `json:"location"`
-	Keyword     string                   `json:"keyword"`
-	KeywordType messages.StepKeywordType `json:"keywordType,omitempty"`
-	Text        string                   `json:"text"`
-	DocString   *parameter.DocString     `json:"docString,omitempty"`
-	DataTable   *parameter.DataTable     `json:"dataTable,omitempty"`
+	*messages.Step
 
-	// Step Definition
+	// Step Function
 	Func reflect.Value   `json:"-"`
 	Args []reflect.Value `json:"-"`
 

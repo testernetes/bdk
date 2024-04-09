@@ -4,13 +4,22 @@ import (
 	"context"
 	"time"
 
-	"github.com/onsi/gomega/types"
+	"github.com/onsi/gomega/gbytes"
 	"github.com/testernetes/bdk/stepdef"
-	corev1 "k8s.io/api/core/v1"
+	"github.com/testernetes/bdk/store"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var AsyncAssertExecFunc = func(ctx context.Context, phrase string, timeout time.Duration, ref *unstructured.Unstructured, desiredMatch bool, matcher types.GomegaMatcher, opts *corev1.PodLogOptions) (err error) {
+var AsyncAssertExecFunc = func(ctx context.Context, assert stepdef.Assert, timeout time.Duration, ref *unstructured.Unstructured, desiredMatch bool, text string) (err error) {
+
+	session := store.Load[PodSession](ctx, client.ObjectKeyFromObject(ref).String())
+	matcher := gbytes.Say(text)
+
+	_, err = assert(desiredMatch, matcher, session.Out)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -66,7 +75,7 @@ var AsyncAssertExec = stepdef.StepDefinition{
 		When I create sleeping-pod
 		And I exec "echo hello" in sleeping-pod/busybox
 		Then sleeping-pod exec should say hello`,
-	Function: func(ctx context.Context, ref *unstructured.Unstructured, desiredMatch bool, matcher types.GomegaMatcher, opts *corev1.PodLogOptions) (err error) {
-		return AsyncAssertExecFunc(ctx, "", time.Second, ref, desiredMatch, matcher, opts)
+	Function: func(ctx context.Context, ref *unstructured.Unstructured, desiredMatch bool, matcher string) (err error) {
+		return AsyncAssertExecFunc(ctx, stepdef.Eventually, time.Second, ref, desiredMatch, matcher)
 	},
 }

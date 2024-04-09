@@ -4,9 +4,6 @@ Copyright © 2023 Matt Simons
 package cmd
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/spf13/cobra"
 	"github.com/testernetes/bdk/formatters/utils"
 	"github.com/testernetes/bdk/model"
@@ -25,7 +22,7 @@ Examples:
 `
 
 func NewStepsCommand() *cobra.Command {
-	cobra.AddTemplateFunc("parameters", printParameters)
+	//cobra.AddTemplateFunc("parameters", printParameters)
 
 	stepsCmd := &cobra.Command{
 		Use:   "steps",
@@ -33,21 +30,21 @@ func NewStepsCommand() *cobra.Command {
 		Long:  "",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 1 {
-				if args[0] == "print" {
-					var w strings.Builder
-					err := model.StepFunctions.GenMarkdown(&w)
-					if err != nil {
-						return err
-					}
-					fmt.Printf(w.String())
-					return nil
-				}
+				//if args[0] == "print" {
+				//	var w strings.Builder
+				//	err := model.StepFunctions
+				//	if err != nil {
+				//		return err
+				//	}
+				//	fmt.Printf(w.String())
+				//	return nil
+				//}
 			}
 			cmd.Help()
 			return nil
 		},
 	}
-	for _, s := range model.StepFunctions.Get() {
+	for _, s := range *model.StepFunctions {
 		step := &cobra.Command{
 			Use:     s.Name,
 			Short:   s.Text,

@@ -15,6 +15,8 @@ import (
 	"github.com/testernetes/bdk/steps"
 	"github.com/testernetes/bdk/store"
 	"github.com/testernetes/gkube"
+	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -143,7 +145,8 @@ func (sf *stepFunctions) register(input stepdef.StepDefinition) (err error) {
 	}
 
 	tFunc := s.function.Type()
-	if !tFunc.In(1).Implements(reflect.TypeOf((*gkube.KubernetesHelper)(nil)).Elem()) {
+	switch tFunc.In(1) {
+	case reflect.TypeOf((client.WithWatch)(nil)), reflect.TypeOf(kubernetes.Clientset{}):
 		otherIns += 1
 	}
 
@@ -221,11 +224,14 @@ func (sf stepFunction) Matches(ctx context.Context, step *messages.Step) (*Step,
 // instanciate a stepdefinition given a step
 func (sf stepFunction) GetRunner(ctx context.Context, step *messages.Step) (*Step, error) {
 	runner := &Step{
-		Location:    step.Location,
-		Keyword:     step.Keyword,
-		KeywordType: step.KeywordType,
-		Text:        step.Text,
-		Args:        []reflect.Value{reflect.ValueOf(ctx)},
+		Step: step,
+
+		Func: sf.function,
+		Args: []reflect.Value{reflect.ValueOf(ctx)},
+
+		Execution: StepExecution{
+			Result: Skipped,
+		},
 	}
 
 	argOffset := 1
@@ -258,8 +264,6 @@ func (sf stepFunction) GetRunner(ctx context.Context, step *messages.Step) (*Ste
 		}
 		runner.Args = append(runner.Args, arg)
 	}
-
-	runner.Execution.Result = Skipped
 
 	return runner, nil
 }

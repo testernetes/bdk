@@ -70,8 +70,8 @@ var IPatchAResource = stepdef.StepDefinition{
 	  | patch | {"data":{"foo":"nobar"}} |
 	Then for at least 10s cm jsonpath '{.data.foo}' should equal nobar`,
 	// TODO StepArg:
-	Function: func(ctx context.Context, c client.Client, ref *unstructured.Unstructured, patch client.Patch, opts []client.PatchOption) (err error) {
-		return clientDo(ctx, func() error {
+	Function: func(ctx context.Context, c client.WithWatch, ref *unstructured.Unstructured, patch client.Patch, opts []client.PatchOption) (err error) {
+		return withRetry(ctx, func() error {
 			return c.Patch(ctx, ref, patch, opts...)
 		})
 	},

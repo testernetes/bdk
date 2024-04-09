@@ -29,7 +29,7 @@ var IDeleteAResource = stepdef.StepDefinition{
 	  | grace period seconds | 30         |
 	  | propagation policy   | Foreground |`,
 	Function: func(ctx context.Context, c gkube.KubernetesHelper, ref *unstructured.Unstructured, opts []client.DeleteOption) error {
-		return clientDo(ctx, func() error {
+		return withRetry(ctx, func() error {
 			return c.Delete(ctx, ref, opts...)
 		})
 	},
