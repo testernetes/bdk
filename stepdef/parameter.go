@@ -116,39 +116,57 @@ func (p DocStringArgument) Print() string {
 	return buf.String()
 }
 
-var _ StepArgument = (*DataTableArgument)(nil)
+var _ StepArgument = (*dataTableArgument)(nil)
 
-type DataTableArgument struct {
+type DataTableParser func(context.Context, *messages.DataTable, reflect.Type) (reflect.Value, error)
+
+func NewDataTableArgument(name, description, help string, parser DataTableParser) StepArgument {
+	return &dataTableArgument{
+		name:        name,
+		description: description,
+		help:        help,
+		parser:      parser,
+	}
+}
+
+type dataTableArgument struct {
 	name        string
 	description string
 	help        string
-	parser      func(context.Context, *messages.DataTable, reflect.Type) (reflect.Value, error)
+	parser      DataTableParser
 }
 
-func (p DataTableArgument) Name() string {
+func (p dataTableArgument) Name() string {
 	return p.name
 }
 
-func (p DataTableArgument) Description() string {
+func (p dataTableArgument) Description() string {
 	return p.description
 }
 
-func (p DataTableArgument) Help() string {
+func (p dataTableArgument) Help() string {
 	return p.help
 }
 
-func (p DataTableArgument) StepArgType() StepArgType {
+func (p dataTableArgument) StepArgType() StepArgType {
 	return DataTableStepArgType
 }
 
-func (p DataTableArgument) Parse(ctx context.Context, s *messages.Step, t reflect.Type) (reflect.Value, error) {
+func (p dataTableArgument) Parse(ctx context.Context, s *messages.Step, t reflect.Type) (reflect.Value, error) {
 	if s.DocString != nil {
 		return reflect.Value{}, fmt.Errorf("expected a DataTable but found a DocString")
 	}
-	return p.parser(ctx, s.DataTable, t)
+	v, err := p.parser(ctx, s.DataTable, t)
+	if err != nil {
+		return reflect.Value{}, err
+	}
+	if v.Type() != t {
+		return reflect.Value{}, fmt.Errorf("DataTableParser function failed to parse to target type %s", t.String())
+	}
+	return v, nil
 }
 
-func (p DataTableArgument) Print() string {
+func (p dataTableArgument) Print() string {
 	buf := bytes.NewBufferString("")
 	//header := "**Additional Step Arguments: " + p.ShortHelp + "**"
 	//fmt.Fprintf(buf, utils.NewNormalizer(header).Trim().Definition().String())

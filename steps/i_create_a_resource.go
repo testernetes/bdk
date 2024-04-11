@@ -8,9 +8,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var ICreateAResource = stepdef.StepDefinition{
+var createOptions = stepdef.NewDataTableArgument("Create Options",
+	"(optional) A table of additional client create options.",
+	`https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client#CreateOptions
+
+		Create Options:
+		| DryRun       | string  |
+		| FieldManager | string  |`,
+	stepdef.ParseClientOptions,
+)
+
+var ICreate = stepdef.StepDefinition{
 	Name: "i-create",
-	Text: "I create <reference>",
+	Text: "I create {reference}",
 	Help: `Creates the referenced resource. Step will fail if the reference was not defined in a previous step.`,
 	Examples: `
 	Given a resource called cm:
@@ -26,7 +36,7 @@ var ICreateAResource = stepdef.StepDefinition{
 	And I create cm
 	  | field manager | example |
 	Then within 1s cm jsonpath '{.metadata.uid}' should not be empty`,
-	StepArg: stepdef.CreateOptions,
+	StepArg: createOptions,
 	Function: func(ctx context.Context, c client.WithWatch, reference *unstructured.Unstructured, opts []client.CreateOption) (err error) {
 		return withRetry(ctx, func() error {
 			return c.Create(ctx, reference, opts...)

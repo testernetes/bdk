@@ -8,7 +8,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var IGetAResource = stepdef.StepDefinition{
+var IGet = stepdef.StepDefinition{
 	Name: "i-get",
 	Text: "I get <reference>",
 	Help: `Gets the referenced resource. Step will fail if the reference was not defined in a previous step.`,

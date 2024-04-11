@@ -2,15 +2,14 @@ package stepdef
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
-	messages "github.com/cucumber/messages/go/v21"
 	"github.com/onsi/gomega/types"
 	"github.com/testernetes/bdk/store"
 	corev1 "k8s.io/api/core/v1"
@@ -25,44 +24,26 @@ const (
 	CannotParse = "cannot parse '%s' into a %s"
 )
 
-func marshalDataTable(dt *messages.DataTable) ([]byte, error) {
-	j := map[string]interface{}{}
-	for _, row := range dt.Rows {
-		if len(row.Cells) != 2 {
-			return []byte{}, fmt.Errorf("table must be a width of 2 containing key/value pairs to parse into a struct")
-		}
-		key := row.Cells[0].Value
-		val := row.Cells[1].Value
-
-		// use unmarshal to automatically parse value to correct type
-		var v interface{}
-		err := yaml.Unmarshal([]byte(val), &v)
-		if err != nil {
-			return []byte{}, err
-		}
-
-		j[key] = v
+func ParseFileToClientObject(ctx context.Context, path string, targetType reflect.Type) (_ reflect.Value, err error) {
+	manifest, err := ioutil.ReadFile(path)
+	if err != nil {
+		return reflect.Value{}, err
 	}
-	return json.Marshal(j)
+	return unmarshalToClientObject(manifest, targetType)
 }
 
-func ParseDataTable(ctx context.Context, dt *messages.DataTable, targetType reflect.Type) (_ reflect.Value, err error) {
-	var o any
-	switch targetType.Kind() {
-	case reflect.Ptr:
-		o = reflect.New(targetType)
-		if _, ok := o.(*messages.DataTable); ok {
-			o = dt
-		} else {
-			var b []byte
-			b, err = marshalDataTable(dt)
-			err = yaml.Unmarshal(b, o)
-		}
-	default:
-		return reflect.Value{}, fmt.Errorf(CannotParse, "DataTable (step argument)", targetType.String())
+func ParseClientObject(ctx context.Context, s string, targetType reflect.Type) (reflect.Value, error) {
+	u := store.Load[*unstructured.Unstructured](ctx, s)
+	if targetType == reflect.TypeOf((*unstructured.Unstructured)(nil)) {
+		return reflect.ValueOf(u), nil
 	}
 
-	return reflect.ValueOf(o), err
+	o := reflect.New(targetType)
+	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, o)
+	if err != nil {
+		return reflect.Value{}, err
+	}
+	return reflect.ValueOf(o), nil
 }
 
 type stringParsers map[reflect.Type]func(context.Context, string) (reflect.Value, error)
@@ -94,11 +75,11 @@ var StringParsers = stringParsers{
 
 	//TODO uint uint8 uint16 uint32 uint64 uintptr
 
-	reflect.TypeOf((Assert)(nil)):                     parseAssertion,
-	reflect.TypeOf(time.Duration(0)):                  parseGeneric(time.ParseDuration),
-	reflect.TypeOf((*unstructured.Unstructured)(nil)): loadFromStore[*unstructured.Unstructured](),
-	reflect.TypeOf((*corev1.Pod)(nil)):                parsePod,
-	reflect.TypeOf((*types.GomegaMatcher)(nil)):       Matchers.ParseMatcher,
+	reflect.TypeOf((Assert)(nil)):    parseAssertion,
+	reflect.TypeOf(time.Duration(0)): parseGeneric(time.ParseDuration),
+	//reflect.TypeOf((*unstructured.Unstructured)(nil)): loadFromStore[*unstructured.Unstructured](),
+	//reflect.TypeOf((*corev1.Pod)(nil)):                parsePod,
+	reflect.TypeOf((*types.GomegaMatcher)(nil)): Matchers.ParseMatcher,
 
 	reflect.TypeOf(client.DryRunAll):                valueIfTrue(client.DryRunAll),
 	reflect.TypeOf(client.FieldOwner("")):           unmarshal[client.FieldOwner],
@@ -109,52 +90,6 @@ var StringParsers = stringParsers{
 	reflect.TypeOf(client.Limit(0)):                 unmarshal[client.Limit],
 	reflect.TypeOf(client.ForceOwnership):           valueIfTrue(client.ForceOwnership),
 	reflect.TypeOf((client.Patch)(nil)):             loadFromStore[client.Patch](),
-}
-
-var clientOptions = map[string]reflect.Type{
-	"FieldOwner":         reflect.TypeOf(client.FieldOwner("")),
-	"DryRun":             reflect.TypeOf(client.DryRunAll),
-	"GracePeriodSeconds": reflect.TypeOf(client.GracePeriodSeconds(0)),
-	"PropagationPolicy":  reflect.TypeOf(client.PropagationPolicy("")),
-	"Selector":           reflect.TypeOf(client.MatchingLabelsSelector{}),
-	"Namespace":          reflect.TypeOf(client.InNamespace("")),
-	"Limit":              reflect.TypeOf(client.Limit(0)),
-	"Force":              reflect.TypeOf(client.ForceOwnership),
-	// TODO FieldSelector
-}
-
-func parseClientOptions(ctx context.Context, dt *messages.DataTable, targetType reflect.Type) (reflect.Value, error) {
-	if targetType.Kind() != reflect.Slice {
-		return reflect.Value{}, errors.New("expected targetType to be a slice of client options")
-	}
-
-	opts := reflect.New(targetType)
-
-	// switch from []client.CreateOption to client.CreateOption for example
-	targetType = targetType.Elem()
-
-	for _, r := range dt.Rows {
-		if len(r.Cells) != 2 {
-			return reflect.Value{}, errors.New("expected table to have width of 2")
-		}
-
-		key := r.Cells[0].Value
-		clientOption := clientOptions[key]
-		if !clientOption.Implements(targetType) {
-			return reflect.Value{}, fmt.Errorf("%s is not a valid option for %s", key, targetType.String())
-		}
-
-		value := r.Cells[1].Value
-		opt, err := StringParsers[clientOption](ctx, value)
-		if err != nil {
-			if _, skip := err.(*skipValueErr); skip {
-				continue
-			}
-			return reflect.Value{}, err
-		}
-		opts = reflect.Append(opts, opt)
-	}
-	return opts, nil
 }
 
 type skipValueErr struct{}
@@ -234,34 +169,6 @@ func parsePod(ctx context.Context, s string) (reflect.Value, error) {
 	return reflect.ValueOf(pod), nil
 }
 
-func loadFromStore[T any]() func(context.Context, string) (reflect.Value, error) {
-	return func(ctx context.Context, s string) (reflect.Value, error) {
-		return reflect.ValueOf(store.Load[T](ctx, s)), nil
-	}
-}
-
-func parseDocString(ctx context.Context, ds *messages.DocString, targetType reflect.Type) (_ reflect.Value, err error) {
-	if targetType == reflect.TypeOf((*messages.DocString)(nil)) {
-		return reflect.ValueOf(ds), nil
-	}
-	if targetType == reflect.TypeOf((*unstructured.Unstructured)(nil)) {
-		u := &unstructured.Unstructured{}
-		err := yaml.Unmarshal([]byte(ds.Content), u)
-
-		if u.GetAPIVersion() == "" {
-			err = errors.Join(errors.New("Provided test case resource has an empty API Version"))
-		}
-		if u.GetKind() == "" {
-			err = errors.Join(errors.New("Provided test case resource has an empty Kind"))
-		}
-		if u.GetName() == "" {
-			err = errors.Join(errors.New("Provided test case resource has an empty Name"))
-		}
-		return reflect.ValueOf(u), err
-	}
-	return StringParsers.Parse(ctx, ds.Content, targetType)
-}
-
 func parseInt(ctx context.Context, input string) (reflect.Value, error) {
 	v, err := strconv.ParseInt(input, 10, 0)
 	if err != nil {
@@ -335,4 +242,10 @@ func contains(s string, a []string) bool {
 		}
 	}
 	return false
+}
+
+func loadFromStore[T any]() func(context.Context, string) (reflect.Value, error) {
+	return func(ctx context.Context, s string) (reflect.Value, error) {
+		return reflect.ValueOf(store.Load[T](ctx, s)), nil
+	}
 }

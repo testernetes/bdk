@@ -2,7 +2,6 @@ package model
 
 import (
 	"context"
-	"fmt"
 
 	messages "github.com/cucumber/messages/go/v21"
 	"github.com/testernetes/bdk/store"
@@ -13,8 +12,8 @@ import (
 
 type Scenario struct {
 	*messages.Scenario
-	Background *messages.Background `json:"background"`
-	event      chan *Scenario
+	Background  *messages.Background `json:"background"`
+	StepResults map[*messages.Step]StepResult
 }
 
 func NewScenario(bkg *messages.Background, scn *messages.Scenario) (*Scenario, error) {
@@ -28,9 +27,9 @@ func NewScenario(bkg *messages.Background, scn *messages.Scenario) (*Scenario, e
 	return s, nil
 }
 
-func (s *Scenario) Run(ctx context.Context) bool {
-	// add to ctx
-	// * Helper
+func (s *Scenario) Run(ctx context.Context, events Events) error {
+	events.StartScenario(s)
+
 	tc, err := trackedclient.New(config.GetConfigOrDie(), client.Options{})
 	if err != nil {
 		panic(err)
@@ -39,46 +38,37 @@ func (s *Scenario) Run(ctx context.Context) bool {
 
 	ctx = store.NewStoreFor(ctx)
 
-	// TODO add scenario / feature to ctx
+	store.Save(ctx, "", s)
 
 	for _, step := range s.Background.Steps {
-		err := s.runStep(ctx, step)
+		err := s.evalStep(ctx, events, step)
 		if err != nil {
-			return false
+			return err
 		}
 	}
 
 	for _, step := range s.Steps {
-		err := s.runStep(ctx, step)
+		err := s.evalStep(ctx, events, step)
 		if err != nil {
-			return false
+			return err
 		}
 	}
-	return true
-}
 
-func (s *Scenario) runStep(ctx context.Context, step *messages.Step) error {
-	// find a match from step definitions
-	stepFunction := StepFunctions.Eval(ctx, step)
-	if stepFunction == nil {
-		return fmt.Errorf("no matching step defined")
-	}
-	stepFunction.Run()
-	if stepFunction.Execution.Result != Passed {
-		return fmt.Errorf(stepFunction.Execution.Message)
-	}
-	s.ping()
+	events.FinishScenario(s)
 	return nil
 }
 
-func (s *Scenario) ping() {
-	s.event <- s
-}
+func (s *Scenario) evalStep(ctx context.Context, events Events, step *messages.Step) (err error) {
+	store.Save(ctx, "", step)
 
-type Background struct {
-	Location    *messages.Location `json:"location"`
-	Keyword     string             `json:"keyword"`
-	Name        string             `json:"name"`
-	Description string             `json:"description"`
-	Steps       []*Step            `json:"steps"`
+	stepFunction, err := StepFunctions.Eval(ctx, step)
+	if err != nil {
+		return err
+	}
+
+	events.StartStep(s, step)
+	defer events.FinishStep(s, step)
+
+	s.StepResults[step], err = stepFunction.Run()
+	return err
 }

@@ -9,9 +9,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var IDeleteAResource = stepdef.StepDefinition{
+var IDelete = stepdef.StepDefinition{
 	Name: "i-delete",
-	Text: "I delete <reference>",
+	Text: "I delete {reference}",
 	Help: "Deletes the referenced resource. Step will fail if the reference was not defined in a previous step.",
 	Examples: `
 	Given a resource called cm:
@@ -28,6 +28,7 @@ var IDeleteAResource = stepdef.StepDefinition{
 	And I delete cm
 	  | grace period seconds | 30         |
 	  | propagation policy   | Foreground |`,
+	StepArg: stepdef.DeleteOptions,
 	Function: func(ctx context.Context, c gkube.KubernetesHelper, ref *unstructured.Unstructured, opts []client.DeleteOption) error {
 		return withRetry(ctx, func() error {
 			return c.Delete(ctx, ref, opts...)

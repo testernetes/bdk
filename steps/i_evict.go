@@ -12,11 +12,12 @@ import (
 
 var IEvict = stepdef.StepDefinition{
 	Name: "i-evict",
-	Text: "I evict <reference>",
+	Text: "I evict {reference}",
 	Help: "Evicts the referenced pod resource. Step will fail if the pod reference was not defined in a previous step.",
 	Examples: `
 	When I evict pod
 	  | grace period seconds | 120 |`,
+	StepArg: stepdef.DeleteOptions,
 	Function: func(ctx context.Context, c client.WithWatch, pod *corev1.Pod, opts []client.DeleteOption) (err error) {
 		deleteOptions := &client.DeleteOptions{}
 		for _, opt := range opts {

@@ -1,6 +1,7 @@
 package model
 
 import (
+	"context"
 	"errors"
 	"strings"
 
@@ -8,13 +9,8 @@ import (
 )
 
 type Feature struct {
-	Path        string             `json:"string"`
-	Location    *messages.Location `json:"location"`
-	Tags        []*messages.Tag    `json:"tags"`
-	Language    string             `json:"language"`
-	Keyword     string             `json:"keyword"`
-	Name        string             `json:"name"`
-	Description string             `json:"description"`
+	*messages.Feature
+	Path string `json:"string"`
 
 	//Rules []*Rule
 	Scenarios []*Scenario `json:"scenarios"` // or Scenario Outline
@@ -22,13 +18,8 @@ type Feature struct {
 
 func NewFeature(path string, featureDoc *messages.Feature, filters []Filter) (*Feature, error) {
 	f := &Feature{
-		Path:        path,
-		Location:    featureDoc.Location,
-		Tags:        featureDoc.Tags,
-		Language:    featureDoc.Language,
-		Keyword:     featureDoc.Keyword,
-		Name:        featureDoc.Name,
-		Description: featureDoc.Description,
+		Feature: featureDoc,
+		Path:    path,
 	}
 	var rules []*messages.Rule
 
@@ -110,6 +101,18 @@ func NewFeature(path string, featureDoc *messages.Feature, filters []Filter) (*F
 	return f, nil
 }
 
+func (f *Feature) Run(ctx context.Context, events Events) error {
+	events.StartFeature(f)
+	for _, scenario := range f.Scenarios {
+		err := scenario.Run(ctx, events)
+		if err != nil {
+			return err
+		}
+	}
+	events.FinishFeature(f)
+	return nil
+}
+
 func deepCopyScenarioDoc(in *messages.Scenario) *messages.Scenario {
 	if in == nil {
 		return nil
@@ -169,9 +172,3 @@ func deepCopyDataTable(in *messages.DataTable) *messages.DataTable {
 	}
 	return out
 }
-
-//func (f *Feature) Run(ctx context.Context) {
-//	for _, scenario := range f.Scenarios {
-//		scenario.Run(ctx)
-//	}
-//}

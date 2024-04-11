@@ -4,15 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"reflect"
 	"regexp"
 	"strconv"
 
 	messages "github.com/cucumber/messages/go/v21"
-	"github.com/onsi/gomega/types"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -33,54 +29,7 @@ const (
 	exprPort              = `(\d{1,5})`
 )
 
-var (
-	EventuallyPhrases   = []string{"", "within", "in less than", "in under", "in no more than"}
-	ConsistentlyPhrases = []string{"for", "for at least", "for no less than"}
-)
-
-type Assert func(bool, types.GomegaMatcher, any) (bool, error)
-
-func Eventually(desiredMatch bool, matcher types.GomegaMatcher, actual any) (bool, error) {
-	return assert(EventuallyAssertion, desiredMatch, matcher, actual)
-}
-
-func Consistently(desiredMatch bool, matcher types.GomegaMatcher, actual any) (bool, error) {
-	return assert(ConsistentlyAssertion, desiredMatch, matcher, actual)
-}
-
-func assert(assertion assertion, desiredMatch bool, matcher types.GomegaMatcher, actual any) (bool, error) {
-	matches, err := matcher.Match(actual)
-	if err != nil {
-		return false, err
-	}
-
-	if matches == desiredMatch {
-		if assertion == EventuallyAssertion {
-			return false, nil
-		}
-	}
-
-	if matches != desiredMatch {
-		if desiredMatch {
-			err = errors.New(matcher.FailureMessage(actual))
-		} else {
-			err = errors.New(matcher.NegatedFailureMessage(actual))
-		}
-		if assertion == ConsistentlyAssertion {
-			return false, err
-		}
-	}
-	return true, err
-}
-
-type assertion string
-
-const (
-	EventuallyAssertion   assertion = "Eventually"
-	ConsistentlyAssertion assertion = "Consistently"
-)
-
-var CreateOptions = DataTableArgument{
+var CreateOptions = dataTableArgument{
 	name:        "Create Options",
 	description: "(optional) A table of additional client create options.",
 	help: `https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client#CreateOptions
@@ -88,10 +37,10 @@ var CreateOptions = DataTableArgument{
 		Create Options:
 		| DryRun       | string  |
 		| FieldManager | string  |`,
-	parser: parseClientOptions,
+	parser: ParseClientOptions,
 }
 
-var DeleteOptions = DataTableArgument{
+var DeleteOptions = dataTableArgument{
 	name:        "Delete Options",
 	description: `(optional) A table of additional client delete options.`,
 	help: `https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client#DeleteOptions
@@ -100,10 +49,10 @@ var DeleteOptions = DataTableArgument{
 		| DryRun             | string                         |
 		| GracePeriodSeconds | number                         |
 		| PropagationPolicy  | {Orphan|Background|Foreground} |`,
-	parser: parseClientOptions,
+	parser: ParseClientOptions,
 }
 
-var DeleteAllOfOptions = DataTableArgument{
+var DeleteAllOfOptions = dataTableArgument{
 	name:        "Delete All Of Options",
 	description: `(optional) A table of additional client delete all of options.`,
 	help: `https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client#DeleteAllOfOptions
@@ -115,10 +64,10 @@ var DeleteAllOfOptions = DataTableArgument{
 		| Selector           | string                         |
 		| Namespace          | string                         |
 		| Limit              | number                         |`,
-	parser: parseClientOptions,
+	parser: ParseClientOptions,
 }
 
-var ListOptions = DataTableArgument{
+var ListOptions = dataTableArgument{
 	name:        "List Options",
 	description: `(optional) A table of additional client list options.`,
 	help: `https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client#ListOptions
@@ -127,10 +76,10 @@ var ListOptions = DataTableArgument{
 		| Selector  | string |
 		| Namespace | string |
 		| Limit     | number |`,
-	parser: parseClientOptions,
+	parser: ParseClientOptions,
 }
 
-var PatchOptions = DataTableArgument{
+var PatchOptions = dataTableArgument{
 	name:        "Patch Options",
 	description: `A table of additional client patch options.`,
 	help: `https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/client#PatchOptions
@@ -139,12 +88,10 @@ var PatchOptions = DataTableArgument{
 		| DryRun       | string |
 		| FieldManager | string |
 		| Force        | string |`,
-	// TODO // require a patch be declared in previous step
-	parser: parseClientOptions,
+	parser: ParseClientOptions,
 }
 
-// TODO
-var PodLogOptions = DataTableArgument{
+var PodLogOptions = dataTableArgument{
 	name:        "Pod Log Options",
 	description: `(optional) A table of additional client pod log options.`,
 	help: `https://pkg.go.dev/k8s.io/api/core/v1#PodLogOptions
@@ -157,10 +104,10 @@ var PodLogOptions = DataTableArgument{
 		| timestamps   | boolean |
 		| tailLines    | number  |
 		| limitBytes   | number  |`,
-	parser: ParseDataTable,
+	parser: UnmarshalDataTable,
 }
 
-var ProxyGetOptions = DataTableArgument{
+var ProxyGetOptions = dataTableArgument{
 	name:        "Proxy Get Options",
 	description: `(optional) A freeform table of additional query parameters to send with the request.`,
 	help: `
@@ -223,7 +170,7 @@ var Patch = DocStringArgument{
 	        data:
 	          foo: nobar
 		"""`,
-	parser: parseDocString,
+	parser: UnmarshalDocString,
 }
 
 var Manifest = DocStringArgument{
@@ -232,7 +179,7 @@ var Manifest = DocStringArgument{
 	help: `https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects/
 
 		Can be yaml or json depending on the content type.`,
-	parser: parseDocString,
+	parser: ParseDocStringToClientObject,
 }
 
 var Script = DocStringArgument{
@@ -240,14 +187,14 @@ var Script = DocStringArgument{
 	description: `A script.`,
 	help: `The script will run in the specified shell or if none is specified /bin/sh.
 		Its outputs will be captured and can be asserted against in future steps.`,
-	parser: parseDocString,
+	parser: UnmarshalDocString,
 }
 
 var MultiLineText = DocStringArgument{
 	name:        "MultiLine Text",
 	description: `A freeform DocString.`,
 	help:        `Any multiline text.`,
-	parser:      parseDocString,
+	parser:      UnmarshalDocString,
 }
 
 var StringParameters = stringParameters{}
@@ -298,21 +245,7 @@ func init() {
 			help: `https://kubernetes.io/docs/concepts/overview/working-with-objects/kubernetes-objects/
 	
 			Can be yaml or json depending on the content type.`,
-			parser: func(ctx context.Context, path string, targetType reflect.Type) (reflect.Value, error) {
-				manifest, err := ioutil.ReadFile(path)
-				if err != nil {
-					return reflect.Value{}, err
-				}
-
-				// TODO check the targetType
-				u := &unstructured.Unstructured{}
-				err = yaml.UnmarshalStrict(manifest, u)
-				if err != nil {
-					return reflect.Value{}, err
-				}
-
-				return reflect.ValueOf(u), nil
-			},
+			parser: ParseFileToClientObject,
 		},
 		stringParameter{
 			name:        "{assertion}",
@@ -334,7 +267,7 @@ func init() {
 
 		The reference must a name that can be used as a DNS subdomain name as defined in RFC 1123.
 		This is the same Kubernetes requirement for names, i.e. lowercase alphanumeric characters.`,
-			parser: StringParsers.Parse,
+			parser: ParseClientObject,
 		},
 		stringParameter{
 			name:        "{command}",
@@ -371,7 +304,7 @@ func init() {
 			expression:  exprShouldOrShouldNot,
 			description: `Used in conjunction with an assertion to assert that the actual matches the expected.`,
 			help:        `To list available matchers run 'bdk matchers'.`,
-			parser: func(ctx context.Context, s string, t reflect.Type) (_ reflect.Value, err error) {
+			parser: func(ctx context.Context, s string, t reflect.Type) (reflect.Value, error) {
 				if t.Kind() != reflect.Bool {
 					return reflect.Value{}, errors.New("should or should not only supports parsing to bool")
 				}

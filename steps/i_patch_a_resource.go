@@ -37,7 +37,7 @@ var APatch = stepdef.StepDefinition{
 	  """
 	When I patch cm with mypatch
 	Then cm jsonpath '{.data.foo}' should equal nobar`,
-	// TODO StepArg:
+	StepArg: stepdef.Patch,
 	Function: func(ctx context.Context, ref string, ds *messages.DocString) (err error) {
 		patchType := types.PatchType(ds.MediaType)
 		rawPatch := []byte(ds.Content)
@@ -50,7 +50,7 @@ var APatch = stepdef.StepDefinition{
 	},
 }
 
-var IPatchAResource = stepdef.StepDefinition{
+var IPatch = stepdef.StepDefinition{
 	Name: "i-patch",
 	Text: "I patch {reference} with {reference}",
 	Help: `Patches the referenced resource. Step will fail if the reference was not defined in a previous step.`,

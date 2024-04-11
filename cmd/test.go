@@ -21,8 +21,8 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/testernetes/bdk/formatters"
 	"github.com/testernetes/bdk/model"
+	"github.com/testernetes/bdk/printers"
 	"github.com/testernetes/bdk/stepdef"
 )
 
@@ -61,7 +61,7 @@ func NewTestCommand() *cobra.Command {
 
 			filter := model.NewFilter(tags)
 
-			f, err := formatters.NewFormatter(format)
+			printer, err := printers.NewPrinter(format)
 			if err != nil {
 				return fmt.Errorf("error creating formatter: %s\n", err)
 			}
@@ -124,26 +124,23 @@ func NewTestCommand() *cobra.Command {
 				}
 			}()
 
+			events := make(model.Events)
+			printer.Print(events)
+
 			exitCode := 0
 			var wg sync.WaitGroup
 			for i := range features {
-				wg.Add(1)
 				go func(feature *model.Feature) {
+					wg.Add(1)
 					defer wg.Done()
-					f.StartFeature(feature)
-					for _, scenario := range feature.Scenarios {
-						f.StartScenario(feature, scenario)
-						success := scenario.Run(ctx)
-						f.FinishScenario(feature, scenario)
-						if !success {
-							exitCode = 1
-							if fastFail {
-								cancel()
-							}
+					err := feature.Run(ctx, events)
+					if err != nil {
+						fmt.Println(err.Error()) // should be stderr
+						exitCode = 1
+						if fastFail {
+							cancel()
 						}
 					}
-					f.FinishFeature(feature)
-					f.Print(feature)
 				}(features[i])
 			}
 
