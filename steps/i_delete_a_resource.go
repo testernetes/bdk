@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/testernetes/bdk/stepdef"
-	"github.com/testernetes/gkube"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -29,7 +28,7 @@ var IDelete = stepdef.StepDefinition{
 	  | grace period seconds | 30         |
 	  | propagation policy   | Foreground |`,
 	StepArg: stepdef.DeleteOptions,
-	Function: func(ctx context.Context, c gkube.KubernetesHelper, ref *unstructured.Unstructured, opts []client.DeleteOption) error {
+	Function: func(ctx context.Context, c client.WithWatch, ref *unstructured.Unstructured, opts []client.DeleteOption) error {
 		return withRetry(ctx, func() error {
 			return c.Delete(ctx, ref, opts...)
 		})

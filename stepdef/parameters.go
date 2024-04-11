@@ -202,7 +202,7 @@ var StringParameters = stringParameters{}
 type stringParameters []StringParameter
 
 func (sp *stringParameters) SubstituteParameters(step string) (expression string, params []StringParameter, err error) {
-	re := regexp.MustCompile(`(?:{[\w\|]+})+`)
+	re := regexp.MustCompile(`(?:{[^}]+})`)
 	matches := re.FindAllStringSubmatch(step, -1)
 	if len(matches) == 0 {
 		return step, params, nil
@@ -246,6 +246,13 @@ func init() {
 	
 			Can be yaml or json depending on the content type.`,
 			parser: ParseFileToClientObject,
+		},
+		stringParameter{
+			name:        "{jsonpath}",
+			expression:  Anything,
+			description: `A jsonpath to a field`,
+			help:        `https://kubernetes.io/docs/reference/kubectl/jsonpath/`,
+			parser:      StringParsers.Parse,
 		},
 		stringParameter{
 			name:        "{assertion}",

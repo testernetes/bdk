@@ -60,6 +60,7 @@ var AsyncAssertWithTimeout = stepdef.StepDefinition{
 		  """
 		And I create cm
 		Then within 1s cm jsonpath '{.metadata.uid}' should not be empty`,
+	StepArg:  stepdef.NoStepArg,
 	Function: AsyncAssertFunc,
 }
 
@@ -78,6 +79,7 @@ var AsyncAssert = stepdef.StepDefinition{
 		  """
 		And I create cm
 		Then cm jsonpath '{.metadata.uid}' should not be empty`,
+	StepArg: stepdef.NoStepArg,
 	Function: func(ctx context.Context, c client.WithWatch, ref *unstructured.Unstructured, jsonpath string, desiredMatch bool, matcher types.GomegaMatcher) (err error) {
 		return AsyncAssertFunc(ctx, c, stepdef.Eventually, time.Second, ref, jsonpath, desiredMatch, matcher)
 	},

@@ -26,7 +26,7 @@ var AsyncAssertExecFunc = func(ctx context.Context, assert stepdef.Assert, timeo
 
 var AsyncAssertExecWithTimeout = stepdef.StepDefinition{
 	Name: "it-should-exec-duration",
-	Text: "<assertion> <duration> <reference> exec (should|should not) say <text>",
+	Text: "{assertion} {duration} {reference} exec {should|should not} say {text}",
 	Help: `Asserts that the referenced pod session has logged something within the specified duration`,
 	Examples: `
 		Given a resource called sleeping-pod:
@@ -48,12 +48,13 @@ var AsyncAssertExecWithTimeout = stepdef.StepDefinition{
 		When I create sleeping-pod
 		And I exec "echo hello" in sleeping-pod/busybox
 		Then within 30s sleeping-pod exec should say hello`,
+	StepArg:  stepdef.NoStepArg,
 	Function: AsyncAssertExecFunc,
 }
 
 var AsyncAssertExec = stepdef.StepDefinition{
 	Name: "it-should-exec",
-	Text: "<reference> exec (should|should not) say <text>",
+	Text: "{reference} exec {should|should not} say {text}",
 	Help: `Asserts that the referenced pod session has logged something`,
 	Examples: `
 		Given a resource called sleeping-pod:
@@ -75,6 +76,7 @@ var AsyncAssertExec = stepdef.StepDefinition{
 		When I create sleeping-pod
 		And I exec "echo hello" in sleeping-pod/busybox
 		Then sleeping-pod exec should say hello`,
+	StepArg: stepdef.NoStepArg,
 	Function: func(ctx context.Context, ref *unstructured.Unstructured, desiredMatch bool, matcher string) (err error) {
 		return AsyncAssertExecFunc(ctx, stepdef.Eventually, time.Second, ref, desiredMatch, matcher)
 	},

@@ -9,7 +9,7 @@ import (
 	"github.com/testernetes/gkube"
 )
 
-var AsyncAssertRespFunc = func(ctx context.Context, c gkube.KubernetesHelper, assert stepdef.Assert, timeout time.Duration, s gkube.PodSession, desiredMatch bool, text string) (err error) {
+var AsyncAssertRespFunc = func(ctx context.Context, assert stepdef.Assert, timeout time.Duration, s gkube.PodSession, desiredMatch bool, text string) (err error) {
 	defer s.Out.CancelDetects()
 
 	retry := true
@@ -34,7 +34,7 @@ var AsyncAssertRespFunc = func(ctx context.Context, c gkube.KubernetesHelper, as
 
 var AsyncAssertRespWithTimeout = stepdef.StepDefinition{
 	Name: "it-should-resp-duration",
-	Text: "<assertion> <duration> <reference> response (should|should not) say <text>",
+	Text: "{assertion} {duration} {reference} response {should|should not} say {text}",
 	Help: `Asserts that the referenced pod session has responded with something within the specified duration`,
 	Examples: `
 		Given a resource called sleeping-pod:
@@ -56,12 +56,13 @@ var AsyncAssertRespWithTimeout = stepdef.StepDefinition{
 		When I create my-api
 		And I proxy get http://my-app:8000/fake
 		Then within 30s my-api response should say hello`,
+	StepArg:  stepdef.NoStepArg,
 	Function: AsyncAssertRespFunc,
 }
 
 var AsyncAssertResp = stepdef.StepDefinition{
 	Name: "it-should-resp",
-	Text: "<reference> response (should|should not) say <text>",
+	Text: "{reference} response {should|should not} say {text}",
 	Help: `Asserts that the referenced pod session has logged something`,
 	Examples: `
 		Given a resource called sleeping-pod:
@@ -83,7 +84,8 @@ var AsyncAssertResp = stepdef.StepDefinition{
 		When I create my-api
 		And I proxy get http://my-app:8000/fake
 		Then within 30s my-api response should say hello`,
-	Function: func(ctx context.Context, c gkube.KubernetesHelper, ref gkube.PodSession, desiredMatch bool, text string) (err error) {
-		return AsyncAssertRespFunc(ctx, c, stepdef.Eventually, time.Second, ref, desiredMatch, text)
+	StepArg: stepdef.NoStepArg,
+	Function: func(ctx context.Context, ref gkube.PodSession, desiredMatch bool, text string) (err error) {
+		return AsyncAssertRespFunc(ctx, stepdef.Eventually, time.Second, ref, desiredMatch, text)
 	},
 }

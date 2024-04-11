@@ -44,7 +44,7 @@ var IProxyGetFunc = func(ctx context.Context, c kubernetes.Clientset, scheme str
 
 var IProxyGet = stepdef.StepDefinition{
 	Name: "i-proxy-get",
-	Text: "I proxy get <scheme>://<reference>:<port><path>",
+	Text: "I proxy get {scheme}://{reference}:{port}{path}",
 	Help: `Create a proxy connection to the referenced pod resource and attempts a http(s) GET for the port and path.
 	Step will fail if the reference was not defined in a previous step.`,
 	Examples: `
@@ -66,13 +66,15 @@ var IProxyGet = stepdef.StepDefinition{
 	And within 1m pod jsonpath '{.status.phase}' should equal Running
 	And I proxy get http://app:8000/fake
 	Then pod response code should equal 404`,
+	StepArg:  stepdef.ProxyGetOptions,
 	Function: IProxyGetFunc,
 }
 
 var IProxyGetHTTP = stepdef.StepDefinition{
+	Name:    "i-proxy-get",
+	Text:    "I proxy get {reference}:{port}{path}",
+	StepArg: stepdef.ProxyGetOptions,
 	Function: func(ctx context.Context, c kubernetes.Clientset, ref *unstructured.Unstructured, port, path string, options map[string]string) error {
 		return IProxyGetFunc(ctx, c, "", ref, port, path, options)
 	},
-	Name: "i-proxy-get",
-	Text: "I proxy get <reference>:<port><path>",
 }

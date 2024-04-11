@@ -3,18 +3,33 @@ package steps
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 
+	"github.com/onsi/gomega/gbytes"
 	"github.com/testernetes/bdk/stepdef"
-	"github.com/testernetes/gkube"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
-var AsyncAssertLogFunc = func(ctx context.Context, c gkube.KubernetesHelper, assert stepdef.Assert, timeout time.Duration, pod *corev1.Pod, desiredMatch bool, text string, opts *corev1.PodLogOptions) (err error) {
-	s, err := c.Logs(ctx, pod, opts, nil, nil)
+var AsyncAssertLogFunc = func(ctx context.Context, c kubernetes.Clientset, assert stepdef.Assert, timeout time.Duration, pod *corev1.Pod, desiredMatch bool, text string, opts *corev1.PodLogOptions) (err error) {
+	stream, err := c.CoreV1().
+		Pods(pod.Namespace).
+		GetLogs(pod.Name, opts).
+		Stream(ctx)
 	if err != nil {
 		return err
 	}
+
+	s := &PodSession{
+		Out: gbytes.NewBuffer(),
+	}
+
+	go func() {
+		defer stream.Close()
+		_, err = io.Copy(s.Out, stream)
+	}()
+
 	defer s.Out.CancelDetects()
 
 	retry := true
@@ -26,7 +41,7 @@ var AsyncAssertLogFunc = func(ctx context.Context, c gkube.KubernetesHelper, ass
 			}
 		case <-ctx.Done():
 			return
-		case <-s.Buffer().Detect(text):
+		case <-s.Out.Detect(text):
 			if desiredMatch {
 				return nil
 			}
@@ -61,6 +76,7 @@ var AsyncAssertLogWithTimeout = stepdef.StepDefinition{
 		Then within 1m testernetes logs should say Behaviour Driven Kubernetes
 		  | container | bdk   |
 		  | follow    | false |`,
+	StepArg:  stepdef.PodLogOptions,
 	Function: AsyncAssertLogFunc,
 }
 
@@ -87,7 +103,8 @@ var AsyncAssertLog = stepdef.StepDefinition{
 		  """
 		When I create testernetes
 		Then testernetes logs should say Behaviour Driven Kubernetes`,
-	Function: func(ctx context.Context, c gkube.KubernetesHelper, pod *corev1.Pod, desiredMatch bool, text string, opts *corev1.PodLogOptions) (err error) {
+	StepArg: stepdef.PodLogOptions,
+	Function: func(ctx context.Context, c kubernetes.Clientset, pod *corev1.Pod, desiredMatch bool, text string, opts *corev1.PodLogOptions) (err error) {
 		return AsyncAssertLogFunc(ctx, c, stepdef.Eventually, time.Second, pod, desiredMatch, text, opts)
 	},
 }
@@ -97,7 +114,7 @@ var AsyncAssertLog = stepdef.StepDefinition{
 // TODO maybe embed podLogOptions in DocString
 //var AsyncAssertLogWithTimeoutMultiline = scheme.StepDefinition{
 //	Name: "it-should-log-duration-multiline",
-//	Text: "<assertion> <duration> <reference> logs (should|should not) say",
+//	Text: "{assertion} {duration} {reference} logs (should|should not) say",
 //	Help: `Assets that the referenced resource will log something within the specified duration`,
 //	Examples: `
 //		Given a resource called bdk:
