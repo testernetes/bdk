@@ -15,6 +15,7 @@ import (
 	"plugin"
 	"strings"
 	"sync"
+	"time"
 
 	gherkin "github.com/cucumber/gherkin/go/v26"
 	messages "github.com/cucumber/messages/go/v21"
@@ -116,16 +117,23 @@ func NewTestCommand() *cobra.Command {
 			ctx, cancel = context.WithCancel(ctx)
 
 			go func() {
-				select {
-				case <-c:
-					fmt.Printf("\nUser Interrupted, jumping to cleanup now. Press ^C again to skip cleanup.\n\n")
-					cancel()
-				case <-ctx.Done():
+				var exitnow bool
+				for {
+					select {
+					case <-c:
+						fmt.Printf("\nUser Interrupted, jumping to cleanup now. Press ^C again to skip cleanup.\n\n")
+						cancel()
+						if exitnow {
+							panic("exited before cleanup could finish, there may be some leftover resources")
+						}
+						exitnow = true
+					case <-ctx.Done():
+					}
 				}
 			}()
 
 			events := make(model.Events)
-			printer.Print(events)
+			go printer.Print(events)
 
 			exitCode := 0
 			var wg sync.WaitGroup
@@ -148,6 +156,8 @@ func NewTestCommand() *cobra.Command {
 
 			signal.Stop(c)
 			cancel()
+			time.Sleep(time.Second)
+			close(events)
 
 			os.Exit(exitCode)
 			return nil

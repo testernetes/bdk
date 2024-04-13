@@ -9,7 +9,7 @@ import (
 
 var AResourceFromFile = stepdef.StepDefinition{
 	Name:     "a-resource-from-file",
-	Text:     "a {reference} from {filename}",
+	Text:     "^a {reference} from {filename}$",
 	Function: SaveObjectFunc,
 	StepArg:  stepdef.NoStepArg,
 	Help: `Assigns a reference to the resource given in the filename. This reference can be referred to
@@ -20,7 +20,7 @@ in future steps in the same scenario. JSON and YAML formats are accepted.`,
 
 var AResource = stepdef.StepDefinition{
 	Name:     "a-resource",
-	Text:     "a resource called {reference}",
+	Text:     "^a resource called {reference}$",
 	Function: SaveObjectFunc,
 	StepArg:  stepdef.Manifest,
 	Help: `Assigns a reference to the resource given in the DocString. This reference can be referred to

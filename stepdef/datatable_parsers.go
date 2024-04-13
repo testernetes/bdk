@@ -69,7 +69,10 @@ func ParseClientOptions(ctx context.Context, dt *messages.DataTable, targetType 
 		return reflect.Value{}, errors.New("expected targetType to be a slice of client options")
 	}
 
-	opts := reflect.New(targetType)
+	opts := reflect.New(targetType).Elem()
+	if dt == nil {
+		return opts, nil
+	}
 
 	// switch from []client.CreateOption to client.CreateOption for example
 	targetType = targetType.Elem()

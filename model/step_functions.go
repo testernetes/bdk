@@ -14,6 +14,7 @@ import (
 	"github.com/testernetes/bdk/store"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var (
@@ -85,21 +86,24 @@ func (sf *stepFunction) Eval(ctx context.Context, step *messages.Step) (*StepRun
 
 	// TODO add the clients in
 	targetType := tFunc.In(argOffset)
-	if targetType == reflect.TypeOf((*client.WithWatch)(nil)) {
-		client := store.Load[client.WithWatch](ctx, "client")
+	if targetType.Implements(reflect.TypeOf((*client.WithWatch)(nil)).Elem()) {
+		client := store.Load[client.WithWatch](ctx, "clientWithWatch")
 		runner.Args = append(runner.Args, reflect.ValueOf(client))
 		argOffset += 1
 	}
 
 	captureGroups := sf.re.FindStringSubmatch(step.Text)[1:]
+	var matchedSoFar string
 	for i, p := range sf.parameters {
 		value := captureGroups[i]
 		targetType := tFunc.In(argOffset + i)
 
 		arg, err := p.Parse(ctx, value, targetType)
 		if err != nil {
-			return nil, fmt.Errorf("cannot parse parameter %d with value %s into type %s: %w", i, value, targetType.String(), err)
+			fmt.Printf(matchedSoFar)
+			return nil, fmt.Errorf("[%d]: %s => ???%s???: %w", i, value, targetType.String(), err)
 		}
+		matchedSoFar = fmt.Sprintf("%s[%d]: %s => %s\n", matchedSoFar, i, value, arg)
 		runner.Args = append(runner.Args, arg)
 	}
 
@@ -141,10 +145,12 @@ func (s *stepFunctions) Eval(ctx context.Context, step *messages.Step) (*StepRun
 	// TODO datatable replacement
 
 	for _, sf := range *s {
+		log.FromContext(ctx).V(1).Info(sf.re.String())
 		if sf.Matches(step) {
 			return sf.Eval(ctx, step)
 		}
 	}
+
 	return nil, fmt.Errorf("could not find a matching step")
 }
 

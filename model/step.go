@@ -76,6 +76,8 @@ func (s *StepRunner) Run() (result StepResult, err error) {
 			}
 			err = errors.New(string(debug.Stack()))
 			result.Result = Unknown
+
+			panic(r)
 			return
 
 		}

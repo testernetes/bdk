@@ -17,6 +17,7 @@ type Printer struct {
 func (p Printer) Print(events model.Events) {
 	for {
 		event, more := <-events
+		fmt.Printf("%s\n", event.Type)
 		if !more {
 			return
 		}

@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
+	"strings"
 
 	messages "github.com/cucumber/messages/go/v21"
 )
@@ -18,7 +19,7 @@ const (
 	OneOrMultipleWords    = `([\w+\s*]+)`
 	AsyncType             = OneOrMultipleWords
 	exprDuration          = `((?:\d*\.?\d+h)?(?:\d*\.?\d+m)?(?:\d*\.?\d+s)?(?:\d*\.?\d+ms)?(?:\d*\.?\d+(?:us|µs))?(?:\d*\.?\d+ns)?)`
-	exprShouldOrShouldNot = `(?:should\s?|to\s?)(not)?`
+	exprShouldOrShouldNot = `((?:should\s?|to\s?)(?:not)?)`
 	Anything              = `(.*)`
 	exprArray             = Anything
 	exprComparator        = `([=<>]{1,2})`
@@ -249,7 +250,7 @@ func init() {
 		},
 		stringParameter{
 			name:        "{jsonpath}",
-			expression:  Anything,
+			expression:  SingleQuoted,
 			description: `A jsonpath to a field`,
 			help:        `https://kubernetes.io/docs/reference/kubectl/jsonpath/`,
 			parser:      StringParsers.Parse,
@@ -315,13 +316,14 @@ func init() {
 				if t.Kind() != reflect.Bool {
 					return reflect.Value{}, errors.New("should or should not only supports parsing to bool")
 				}
-				if s == "should" {
+				s = strings.TrimSpace(s)
+				if s == "should" || s == "to" {
 					return reflect.ValueOf(true), nil
 				}
-				if s == "should not" {
+				if s == "should not" || s == "to not" {
 					return reflect.ValueOf(false), nil
 				}
-				return reflect.Value{}, errors.New("should or should not expression failed")
+				return reflect.Value{}, fmt.Errorf("should or should not expression failed: received '%s'", s)
 			},
 		},
 		stringParameter{

@@ -47,7 +47,7 @@ var AsyncAssertFunc = func(ctx context.Context, c client.WithWatch, assert stepd
 
 var AsyncAssertWithTimeout = stepdef.StepDefinition{
 	Name: "it-should-object-duration",
-	Text: "{assertion} {duration} {reference} jsonpath {jsonpath} {should|should not} {matcher}",
+	Text: "^{assertion} {duration} {reference} jsonpath {jsonpath} {should|should not} {matcher}$",
 	Help: `Asserts that the referenced resource will satisfy the matcher in the specified duration`,
 	Examples: `
 		Given a resource called cm:
@@ -66,7 +66,7 @@ var AsyncAssertWithTimeout = stepdef.StepDefinition{
 
 var AsyncAssert = stepdef.StepDefinition{
 	Name: "it-should-object",
-	Text: "{reference} jsonpath {jsonpath} {should|should not} {matcher}",
+	Text: "^{reference} jsonpath {jsonpath} {should|should not} {matcher}$",
 	Help: `Asserts that the referenced resource will satisfy the matcher`,
 	Examples: `
 		Given a resource called cm:

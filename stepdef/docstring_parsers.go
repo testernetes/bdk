@@ -6,9 +6,6 @@ import (
 	"reflect"
 
 	messages "github.com/cucumber/messages/go/v21"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 )
 
@@ -23,29 +20,26 @@ func UnmarshalDocString(ctx context.Context, ds *messages.DocString, targetType 
 
 // Provides some basic validation object validation
 func unmarshalToClientObject(b []byte, targetType reflect.Type) (_ reflect.Value, err error) {
-	if !targetType.Implements(reflect.TypeOf((client.Object)(nil))) {
-		return reflect.Value{}, errors.New("targetType does not implement client.Object")
+	o, err := toClientObject(targetType)
+	if err != nil {
+		return reflect.Value{}, err
 	}
 
-	u := &unstructured.Unstructured{}
-	err = yaml.Unmarshal(b, u)
+	err = yaml.Unmarshal(b, o)
+	if err != nil {
+		return reflect.Value{}, err
+	}
 
-	if u.GetAPIVersion() == "" {
+	apiVersion, kind := o.GetObjectKind().GroupVersionKind().ToAPIVersionAndKind()
+	if apiVersion == "" {
 		err = errors.Join(errors.New("Provided test case resource has an empty API Version"))
 	}
-	if u.GetKind() == "" {
+	if kind == "" {
 		err = errors.Join(errors.New("Provided test case resource has an empty Kind"))
 	}
-	if u.GetName() == "" {
+	if o.GetName() == "" {
 		err = errors.Join(errors.New("Provided test case resource has an empty Name"))
 	}
-
-	if targetType == reflect.TypeOf((*unstructured.Unstructured)(nil)) {
-		return reflect.ValueOf(u), nil
-	}
-
-	o := reflect.New(targetType)
-	err = runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, o)
 	return reflect.ValueOf(o), err
 }
 

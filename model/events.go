@@ -1,6 +1,8 @@
 package model
 
-import messages "github.com/cucumber/messages/go/v21"
+import (
+	messages "github.com/cucumber/messages/go/v21"
+)
 
 type EventType string
 

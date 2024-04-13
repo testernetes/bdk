@@ -2,7 +2,8 @@ package store
 
 import (
 	"context"
-	"fmt"
+
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type store struct{}
@@ -10,8 +11,8 @@ type store struct{}
 func Save[T any](ctx context.Context, key string, value T) {
 	storage := ctx.Value(&store{}).(map[string]any)
 
-	key = fmt.Sprintf("%T %s", value, key)
 	storage[key] = value
+	log.FromContext(ctx).V(1).Info("saved %+v to '%s'\n", value, key)
 }
 
 // Load or create new value
@@ -19,10 +20,12 @@ func Load[T any](ctx context.Context, key string) T {
 	storage := ctx.Value(&store{}).(map[string]any)
 
 	var t T
-	key = fmt.Sprintf("%T %s", t, key)
+	log.FromContext(ctx).V(1).Info("loading from '%s' => ", key)
 	if value, exists := storage[key]; exists {
+		log.FromContext(ctx).V(1).Info("found %+v %T\n", value, value)
 		return value.(T)
 	}
+	log.FromContext(ctx).V(1).Info("did not find\n")
 
 	storage[key] = t
 	return t

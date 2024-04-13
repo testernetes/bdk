@@ -32,14 +32,29 @@ func ParseFileToClientObject(ctx context.Context, path string, targetType reflec
 	return unmarshalToClientObject(manifest, targetType)
 }
 
+func toClientObject(targetType reflect.Type) (client.Object, error) {
+	if targetType.Kind() != reflect.Ptr {
+		return nil, fmt.Errorf("%s is not a pointer", targetType)
+	}
+
+	o, ok := reflect.New(targetType.Elem()).Interface().(client.Object)
+	if !ok {
+		return nil, fmt.Errorf("%s does not implement client.Object", targetType)
+	}
+	return o, nil
+}
+
 func ParseClientObject(ctx context.Context, s string, targetType reflect.Type) (reflect.Value, error) {
 	u := store.Load[*unstructured.Unstructured](ctx, s)
 	if targetType == reflect.TypeOf((*unstructured.Unstructured)(nil)) {
 		return reflect.ValueOf(u), nil
 	}
 
-	o := reflect.New(targetType)
-	err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, o)
+	o, err := toClientObject(targetType)
+	if err != nil {
+		return reflect.Value{}, err
+	}
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, o)
 	if err != nil {
 		return reflect.Value{}, err
 	}
@@ -79,7 +94,7 @@ var StringParsers = stringParsers{
 	reflect.TypeOf(time.Duration(0)): parseGeneric(time.ParseDuration),
 	//reflect.TypeOf((*unstructured.Unstructured)(nil)): loadFromStore[*unstructured.Unstructured](),
 	//reflect.TypeOf((*corev1.Pod)(nil)):                parsePod,
-	reflect.TypeOf((*types.GomegaMatcher)(nil)): Matchers.ParseMatcher,
+	reflect.TypeOf((*types.GomegaMatcher)(nil)).Elem(): Matchers.ParseMatcher,
 
 	reflect.TypeOf(client.DryRunAll):                valueIfTrue(client.DryRunAll),
 	reflect.TypeOf(client.FieldOwner("")):           unmarshal[client.FieldOwner],

@@ -161,7 +161,7 @@ func (p dataTableArgument) Parse(ctx context.Context, s *messages.Step, t reflec
 		return reflect.Value{}, err
 	}
 	if v.Type() != t {
-		return reflect.Value{}, fmt.Errorf("DataTableParser function failed to parse to target type %s", t.String())
+		return reflect.Value{}, fmt.Errorf("DataTableParser function returned a %s, expected %s", v.Type(), t)
 	}
 	return v, nil
 }

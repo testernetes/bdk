@@ -21,8 +21,9 @@ func NewScenario(bkg *messages.Background, scn *messages.Scenario) (*Scenario, e
 		bkg = &messages.Background{}
 	}
 	s := &Scenario{
-		Scenario:   scn,
-		Background: bkg,
+		Scenario:    scn,
+		Background:  bkg,
+		StepResults: make(map[*messages.Step]StepResult),
 	}
 	return s, nil
 }
@@ -38,7 +39,9 @@ func (s *Scenario) Run(ctx context.Context, events Events) error {
 
 	ctx = store.NewStoreFor(ctx)
 
-	store.Save(ctx, "", s)
+	store.Save(ctx, "scenario", s)
+	store.Save(ctx, "clientWithWatch", tc.(client.WithWatch))
+	//store.Save(ctx, "", tc) clientset
 
 	for _, step := range s.Background.Steps {
 		err := s.evalStep(ctx, events, step)
@@ -59,7 +62,7 @@ func (s *Scenario) Run(ctx context.Context, events Events) error {
 }
 
 func (s *Scenario) evalStep(ctx context.Context, events Events, step *messages.Step) (err error) {
-	store.Save(ctx, "", step)
+	store.Save(ctx, "step", step)
 
 	stepFunction, err := StepFunctions.Eval(ctx, step)
 	if err != nil {
