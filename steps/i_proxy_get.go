@@ -9,11 +9,10 @@ import (
 	"github.com/testernetes/bdk/stepdef"
 	"github.com/testernetes/bdk/store"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var IProxyGetFunc = func(ctx context.Context, c kubernetes.Clientset, scheme string, obj *unstructured.Unstructured, port, path string, params map[string]string) (err error) {
+var IProxyGetFunc = func(ctx context.Context, t *stepdef.T, scheme string, obj *unstructured.Unstructured, port, path string, params map[string]string) (err error) {
 	session := &PodSession{
 		Out: gbytes.NewBuffer(),
 	}
@@ -21,11 +20,11 @@ var IProxyGetFunc = func(ctx context.Context, c kubernetes.Clientset, scheme str
 
 	switch obj.GetObjectKind().GroupVersionKind().Kind {
 	case "Pod":
-		stream, err = c.CoreV1().
+		stream, err = t.Clientset.CoreV1().
 			Pods(obj.GetNamespace()).ProxyGet(scheme, obj.GetName(), port, path, params).
 			Stream(ctx)
 	case "Service":
-		stream, err = c.CoreV1().
+		stream, err = t.Clientset.CoreV1().
 			Services(obj.GetNamespace()).ProxyGet(scheme, obj.GetName(), port, path, params).
 			Stream(ctx)
 	default:
@@ -44,7 +43,7 @@ var IProxyGetFunc = func(ctx context.Context, c kubernetes.Clientset, scheme str
 
 var IProxyGet = stepdef.StepDefinition{
 	Name: "i-proxy-get",
-	Text: "I proxy get {scheme}://{reference}:{port}{path}",
+	Text: "^I proxy get {scheme}://{reference}:{port}{path}$",
 	Help: `Create a proxy connection to the referenced pod resource and attempts a http(s) GET for the port and path.
 	Step will fail if the reference was not defined in a previous step.`,
 	Examples: `
@@ -72,9 +71,9 @@ var IProxyGet = stepdef.StepDefinition{
 
 var IProxyGetHTTP = stepdef.StepDefinition{
 	Name:    "i-proxy-get",
-	Text:    "I proxy get {reference}:{port}{path}",
+	Text:    "^I proxy get {reference}:{port}{path}$",
 	StepArg: stepdef.ProxyGetOptions,
-	Function: func(ctx context.Context, c kubernetes.Clientset, ref *unstructured.Unstructured, port, path string, options map[string]string) error {
-		return IProxyGetFunc(ctx, c, "", ref, port, path, options)
+	Function: func(ctx context.Context, t *stepdef.T, ref *unstructured.Unstructured, port, path string, options map[string]string) error {
+		return IProxyGetFunc(ctx, t, "", ref, port, path, options)
 	},
 }

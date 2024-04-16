@@ -13,7 +13,7 @@ import (
 
 var APatch = stepdef.StepDefinition{
 	Name: "a-patch",
-	Text: "a patch called {reference}",
+	Text: "^a patch called {reference}$",
 	Help: `A patch which will be applied in a subsequent step`,
 	Examples: `
 	Given a resource called cm:
@@ -52,7 +52,7 @@ var APatch = stepdef.StepDefinition{
 
 var IPatch = stepdef.StepDefinition{
 	Name: "i-patch",
-	Text: "I patch {reference} with {reference}",
+	Text: "^I patch {reference} with {reference}$",
 	Help: `Patches the referenced resource. Step will fail if the reference was not defined in a previous step.`,
 	Examples: `
 	Given a resource called cm:
@@ -70,9 +70,9 @@ var IPatch = stepdef.StepDefinition{
 	  | patch | {"data":{"foo":"nobar"}} |
 	Then for at least 10s cm jsonpath '{.data.foo}' should equal nobar`,
 	StepArg: stepdef.PatchOptions,
-	Function: func(ctx context.Context, c client.WithWatch, ref *unstructured.Unstructured, patch client.Patch, opts []client.PatchOption) (err error) {
+	Function: func(ctx context.Context, t *stepdef.T, ref *unstructured.Unstructured, patch client.Patch, opts []client.PatchOption) (err error) {
 		return withRetry(ctx, func() error {
-			return c.Patch(ctx, ref, patch, opts...)
+			return t.Client.Patch(ctx, ref, patch, opts...)
 		})
 	},
 }

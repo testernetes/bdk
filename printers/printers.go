@@ -4,13 +4,14 @@ import (
 	"fmt"
 
 	"github.com/testernetes/bdk/model"
+	"github.com/testernetes/bdk/printers/json"
 	"github.com/testernetes/bdk/printers/simple"
 )
 
 var Printers = map[string]Printer{
 	"simple": &simple.Printer{},
+	"json":   &json.Printer{},
 	//"configmap": &configmap.Printer{},
-	//"json":      &json.Printer{},
 	//"debug":     &debug.Printer{},
 }
 

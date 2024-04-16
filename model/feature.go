@@ -101,15 +101,16 @@ func NewFeature(path string, featureDoc *messages.Feature, filters []Filter) (*F
 	return f, nil
 }
 
-func (f *Feature) Run(ctx context.Context, events Events) error {
+func (f *Feature) Run(ctx context.Context, events *Events) error {
 	events.StartFeature(f)
+	defer events.FinishFeature(f)
+
 	for _, scenario := range f.Scenarios {
 		err := scenario.Run(ctx, events)
 		if err != nil {
 			return err
 		}
 	}
-	events.FinishFeature(f)
 	return nil
 }
 

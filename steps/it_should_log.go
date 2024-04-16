@@ -9,11 +9,10 @@ import (
 	"github.com/onsi/gomega/gbytes"
 	"github.com/testernetes/bdk/stepdef"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
-var AsyncAssertLogFunc = func(ctx context.Context, c kubernetes.Clientset, assert stepdef.Assert, timeout time.Duration, pod *corev1.Pod, desiredMatch bool, text string, opts *corev1.PodLogOptions) (err error) {
-	stream, err := c.CoreV1().
+var AsyncAssertLogFunc = func(ctx context.Context, t *stepdef.T, assert stepdef.Assert, timeout time.Duration, pod *corev1.Pod, desiredMatch bool, text string, opts *corev1.PodLogOptions) (err error) {
+	stream, err := t.Clientset.CoreV1().
 		Pods(pod.Namespace).
 		GetLogs(pod.Name, opts).
 		Stream(ctx)
@@ -53,7 +52,7 @@ var AsyncAssertLogFunc = func(ctx context.Context, c kubernetes.Clientset, asser
 
 var AsyncAssertLogWithTimeout = stepdef.StepDefinition{
 	Name: "it-should-log-duration",
-	Text: "{assertion} {duration} {reference} logs {should|should not} say {text}",
+	Text: "^{assertion} {duration} {reference} logs {should|should not} say {text}$",
 	Help: `Asserts that the referenced resource will log something within the specified duration`,
 	Examples: `
 		Given a resource called testernetes:
@@ -82,7 +81,7 @@ var AsyncAssertLogWithTimeout = stepdef.StepDefinition{
 
 var AsyncAssertLog = stepdef.StepDefinition{
 	Name: "it-should-log",
-	Text: "{reference} logs {should|should not} say {text}",
+	Text: "^{reference} logs {should|should not} say {text}$",
 	Help: `Asserts that the referenced resource will log something within the specified duration`,
 	Examples: `
 		Given a resource called testernetes:
@@ -104,8 +103,8 @@ var AsyncAssertLog = stepdef.StepDefinition{
 		When I create testernetes
 		Then testernetes logs should say Behaviour Driven Kubernetes`,
 	StepArg: stepdef.PodLogOptions,
-	Function: func(ctx context.Context, c kubernetes.Clientset, pod *corev1.Pod, desiredMatch bool, text string, opts *corev1.PodLogOptions) (err error) {
-		return AsyncAssertLogFunc(ctx, c, stepdef.Eventually, time.Second, pod, desiredMatch, text, opts)
+	Function: func(ctx context.Context, t *stepdef.T, pod *corev1.Pod, desiredMatch bool, text string, opts *corev1.PodLogOptions) (err error) {
+		return AsyncAssertLogFunc(ctx, t, stepdef.Eventually, time.Second, pod, desiredMatch, text, opts)
 	},
 }
 

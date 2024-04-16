@@ -34,7 +34,7 @@ var AsyncAssertRespFunc = func(ctx context.Context, assert stepdef.Assert, timeo
 
 var AsyncAssertRespWithTimeout = stepdef.StepDefinition{
 	Name: "it-should-resp-duration",
-	Text: "{assertion} {duration} {reference} response {should|should not} say {text}",
+	Text: "^{assertion} {duration} {reference} response {should|should not} say {text}$",
 	Help: `Asserts that the referenced pod session has responded with something within the specified duration`,
 	Examples: `
 		Given a resource called sleeping-pod:
@@ -62,7 +62,7 @@ var AsyncAssertRespWithTimeout = stepdef.StepDefinition{
 
 var AsyncAssertResp = stepdef.StepDefinition{
 	Name: "it-should-resp",
-	Text: "{reference} response {should|should not} say {text}",
+	Text: "^{reference} response {should|should not} say {text}$",
 	Help: `Asserts that the referenced pod session has logged something`,
 	Examples: `
 		Given a resource called sleeping-pod:

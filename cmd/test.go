@@ -25,11 +25,14 @@ import (
 	"github.com/testernetes/bdk/model"
 	"github.com/testernetes/bdk/printers"
 	"github.com/testernetes/bdk/stepdef"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 var format string
 var tags string
 var fastFail bool
+var debug bool
 
 // testCmd represents running a test suite
 func NewTestCommand() *cobra.Command {
@@ -128,9 +131,13 @@ func NewTestCommand() *cobra.Command {
 						}
 						exitnow = true
 					case <-ctx.Done():
+						return
 					}
 				}
 			}()
+
+			log.SetLogger(zap.New(zap.UseDevMode(debug)))
+			ctx = log.IntoContext(ctx, log.Log.WithCallDepth(1))
 
 			events := make(model.Events)
 			go printer.Print(events)
@@ -138,10 +145,10 @@ func NewTestCommand() *cobra.Command {
 			exitCode := 0
 			var wg sync.WaitGroup
 			for i := range features {
+				wg.Add(1)
 				go func(feature *model.Feature) {
-					wg.Add(1)
 					defer wg.Done()
-					err := feature.Run(ctx, events)
+					err := feature.Run(ctx, &events)
 					if err != nil {
 						fmt.Println(err.Error()) // should be stderr
 						exitCode = 1
@@ -154,11 +161,11 @@ func NewTestCommand() *cobra.Command {
 
 			wg.Wait()
 
+			events.Close()
 			signal.Stop(c)
 			cancel()
-			time.Sleep(time.Second)
-			close(events)
 
+			time.Sleep(time.Second)
 			os.Exit(exitCode)
 			return nil
 		},
@@ -166,6 +173,7 @@ func NewTestCommand() *cobra.Command {
 	cmd.Flags().StringVarP(&format, "format", "f", "simple", "the format printer")
 	cmd.Flags().StringVarP(&tags, "tags", "t", "", "tags to filter")
 	cmd.Flags().BoolVarP(&fastFail, "fast-fail", "", false, "stop testing on first failure")
+	cmd.Flags().BoolVarP(&debug, "debug", "D", false, "show debug logs")
 
 	cmd.Flags().String("format-configmap-name", "results", "name of configmap to write results to")
 	viper.BindPFlag("format-configmap-name", cmd.Flags().Lookup("format-configmap-name"))

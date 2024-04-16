@@ -45,6 +45,10 @@ func toClientObject(targetType reflect.Type) (client.Object, error) {
 }
 
 func ParseClientObject(ctx context.Context, s string, targetType reflect.Type) (reflect.Value, error) {
+	if targetType.Kind() == reflect.String {
+		return reflect.ValueOf(s), nil
+	}
+
 	u := store.Load[*unstructured.Unstructured](ctx, s)
 	if targetType == reflect.TypeOf((*unstructured.Unstructured)(nil)) {
 		return reflect.ValueOf(u), nil
@@ -54,6 +58,7 @@ func ParseClientObject(ctx context.Context, s string, targetType reflect.Type) (
 	if err != nil {
 		return reflect.Value{}, err
 	}
+
 	err = runtime.DefaultUnstructuredConverter.FromUnstructured(u.Object, o)
 	if err != nil {
 		return reflect.Value{}, err

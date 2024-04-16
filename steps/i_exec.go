@@ -10,7 +10,6 @@ import (
 	"github.com/testernetes/bdk/stepdef"
 	"github.com/testernetes/bdk/store"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/remotecommand"
 	k8sExec "k8s.io/utils/exec"
@@ -24,10 +23,7 @@ type PodSession struct {
 	ExitCode int
 }
 
-var IExecFunc = func(ctx context.Context, c kubernetes.Clientset, cmd []string, pod *corev1.Pod, container string) error {
-	podRestInterface := c.CoreV1().RESTClient()
-	//podRestInterface, err := apiutil.RESTClientForGVK(pod.GroupVersionKind(), false, config.GetConfigOrDie(), serializer.NewCodecFactory(c.Scheme()))
-
+var IExecFunc = func(ctx context.Context, t *stepdef.T, cmd []string, pod *corev1.Pod, container string) error {
 	podExecOpts := &corev1.PodExecOptions{
 		Stdout:    true,
 		Stderr:    true,
@@ -37,7 +33,7 @@ var IExecFunc = func(ctx context.Context, c kubernetes.Clientset, cmd []string, 
 		Command:   cmd,
 	}
 
-	execReq := podRestInterface.Post().
+	execReq := t.Clientset.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(pod.Name).
 		Namespace(pod.Namespace).
@@ -71,42 +67,42 @@ var IExecFunc = func(ctx context.Context, c kubernetes.Clientset, cmd []string, 
 	return err
 }
 
-var IExecScriptFunc = func(ctx context.Context, c kubernetes.Clientset, pod *corev1.Pod, container string, script *messages.DocString) error {
+var IExecScriptFunc = func(ctx context.Context, t *stepdef.T, pod *corev1.Pod, container string, script *messages.DocString) error {
 	shell := script.MediaType
 	if shell == "" {
 		shell = "/bin/sh"
 	}
 	cmd := script.Content
-	return IExecFunc(ctx, c, []string{shell, "-c", cmd}, pod, container)
+	return IExecFunc(ctx, t, []string{shell, "-c", cmd}, pod, container)
 }
 
 var IExecInContainer = stepdef.StepDefinition{
 	Name: "i-exec-in-container",
-	Text: "I exec {command} in {reference}/{container}",
+	Text: "^I exec {command} in {reference}/{container}$",
 	Help: "Executes the given command in a shell in the referenced pod and container.",
 	Examples: `
 	When I exec "echo helloworld" in pod/app`,
 	StepArg: stepdef.NoStepArg,
-	Function: func(ctx context.Context, c kubernetes.Clientset, cmd string, pod *corev1.Pod, container string) error {
-		return IExecFunc(ctx, c, []string{"/bin/sh", "-c", cmd}, pod, container)
+	Function: func(ctx context.Context, t *stepdef.T, cmd string, pod *corev1.Pod, container string) error {
+		return IExecFunc(ctx, t, []string{"/bin/sh", "-c", cmd}, pod, container)
 	},
 }
 
 var IExecInDefaultContainer = stepdef.StepDefinition{
 	Name: "i-exec",
-	Text: "I exec {command} in {reference}",
+	Text: "^I exec {command} in {reference}$",
 	Help: "Executes the given command in a shell in the referenced pod and default container.",
 	Examples: `
 	When I exec "echo helloworld" in pod`,
 	StepArg: stepdef.NoStepArg,
-	Function: func(ctx context.Context, c kubernetes.Clientset, cmd string, pod *corev1.Pod) error {
-		return IExecFunc(ctx, c, []string{"/bin/sh", "-c", cmd}, pod, "")
+	Function: func(ctx context.Context, t *stepdef.T, cmd string, pod *corev1.Pod) error {
+		return IExecFunc(ctx, t, []string{"/bin/sh", "-c", cmd}, pod, "")
 	},
 }
 
 var IExecScriptInContainer = stepdef.StepDefinition{
 	Name: "i-exec-script-in-container",
-	Text: "I exec this script in {reference}/{container}",
+	Text: "^I exec this script in {reference}/{container}$",
 	Help: "Executes the given script in a shell in the referenced pod and container.",
 	Examples: `
 	When I exec this script in pod/app
@@ -119,7 +115,7 @@ var IExecScriptInContainer = stepdef.StepDefinition{
 
 var IExecScriptInDefaultContainer = stepdef.StepDefinition{
 	Name: "i-exec-script",
-	Text: "I exec this script in {reference}",
+	Text: "^I exec this script in {reference}$",
 	Help: "Executes the given script in a shell in the referenced pod and default container.",
 	Examples: `
 	When I exec this script in pod
@@ -127,7 +123,7 @@ var IExecScriptInDefaultContainer = stepdef.StepDefinition{
 	  curl localhost:8080/ready
 	  """`,
 	StepArg: stepdef.Script,
-	Function: func(ctx context.Context, c kubernetes.Clientset, pod *corev1.Pod, script *messages.DocString) error {
-		return IExecScriptFunc(ctx, c, pod, "", script)
+	Function: func(ctx context.Context, t *stepdef.T, pod *corev1.Pod, script *messages.DocString) error {
+		return IExecScriptFunc(ctx, t, pod, "", script)
 	},
 }

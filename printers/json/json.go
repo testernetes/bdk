@@ -9,15 +9,22 @@ import (
 
 type Printer struct{}
 
-func (p Printer) Print(feature *model.Feature) {
-	out, err := yaml.Marshal(feature)
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Printf("%s\n", out)
-}
+func (p Printer) Print(events model.Events) {
+	var features []*model.Feature
+	for {
+		event, more := <-events
+		if !more {
+			out, err := yaml.Marshal(features)
+			if err != nil {
+				fmt.Println(err)
+			}
+			fmt.Printf("%s\n", out)
+			return
+		}
 
-func (p Printer) StartFeature(feature *model.Feature)                             {}
-func (p Printer) FinishFeature(feature *model.Feature)                            {}
-func (p Printer) StartScenario(feature *model.Feature, scenario *model.Scenario)  {}
-func (p Printer) FinishScenario(feature *model.Feature, scenario *model.Scenario) {}
+		switch event.Type {
+		case model.FinishFeature:
+			features = append(features, event.Feature)
+		}
+	}
+}

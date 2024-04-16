@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 const Indentation = `  `
@@ -33,6 +34,7 @@ func Parameter(s string) string {
 type Normalizer interface {
 	String() string
 	Print()
+	Println()
 	Trim() Normalizer
 	TrimTabs() Normalizer
 	TrimAllTabs() Normalizer
@@ -54,7 +56,14 @@ func (s normalizer) String() string {
 	return s.string
 }
 
+func (s normalizer) PrintProgress(timeout time.Duration) {
+}
+
 func (s normalizer) Print() {
+	fmt.Print(s.string)
+}
+
+func (s normalizer) Println() {
 	fmt.Println(s.string)
 }
 

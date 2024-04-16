@@ -12,8 +12,6 @@ import (
 	"github.com/testernetes/bdk/stepdef"
 	"github.com/testernetes/bdk/steps"
 	"github.com/testernetes/bdk/store"
-	"k8s.io/client-go/kubernetes"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -75,20 +73,19 @@ func (sf *stepFunction) Matches(step *messages.Step) bool {
 }
 
 // instanciate a stepdefinition given a step
-func (sf *stepFunction) Eval(ctx context.Context, step *messages.Step) (*StepRunner, error) {
+func (sf *stepFunction) Eval(ctx context.Context, step *messages.Step, events *Events) (*StepRunner, error) {
 	runner := &StepRunner{
-		Func: sf.function,
-		Args: []reflect.Value{reflect.ValueOf(ctx)},
+		Func:   sf.function,
+		Args:   []reflect.Value{reflect.ValueOf(ctx)},
+		Helper: stepdef.NewT(ctx, sf.StepDefinition, events),
 	}
 
 	argOffset := 1 // ctx
 	tFunc := sf.function.Type()
 
-	// TODO add the clients in
 	targetType := tFunc.In(argOffset)
-	if targetType.Implements(reflect.TypeOf((*client.WithWatch)(nil)).Elem()) {
-		client := store.Load[client.WithWatch](ctx, "clientWithWatch")
-		runner.Args = append(runner.Args, reflect.ValueOf(client))
+	if targetType == reflect.TypeOf(&stepdef.T{}) {
+		runner.Args = append(runner.Args, reflect.ValueOf(runner.Helper))
 		argOffset += 1
 	}
 
@@ -123,7 +120,7 @@ type stepFunctions []stepFunction
 
 var StepFunctions = &stepFunctions{}
 
-func (s *stepFunctions) Eval(ctx context.Context, step *messages.Step) (*StepRunner, error) {
+func (s *stepFunctions) Eval(ctx context.Context, step *messages.Step, events *Events) (*StepRunner, error) {
 	text, err := variableSubstitution(ctx, step.Text)
 	if err != nil {
 		return nil, fmt.Errorf("step text: could not substitute variables: %w", err)
@@ -145,9 +142,9 @@ func (s *stepFunctions) Eval(ctx context.Context, step *messages.Step) (*StepRun
 	// TODO datatable replacement
 
 	for _, sf := range *s {
-		log.FromContext(ctx).V(1).Info(sf.re.String())
 		if sf.Matches(step) {
-			return sf.Eval(ctx, step)
+			log.FromContext(ctx).V(1).Info(sf.re.String())
+			return sf.Eval(ctx, step, events)
 		}
 	}
 
@@ -186,16 +183,6 @@ func validateStepDefinition(sd stepdef.StepDefinition) error {
 	return validateFunction(vFunc)
 }
 
-func requestsClient(arg reflect.Type) bool {
-	if arg.Implements(reflect.TypeOf((*client.WithWatch)(nil)).Elem()) {
-		return true
-	}
-	if arg == reflect.TypeOf(kubernetes.Clientset{}) {
-		return true
-	}
-	return false
-}
-
 func (sf *stepFunctions) register(sd stepdef.StepDefinition) (err error) {
 	err = validateStepDefinition(sd)
 	if err != nil {
@@ -209,7 +196,7 @@ func (sf *stepFunctions) register(sd stepdef.StepDefinition) (err error) {
 		requiredNumParams -= 1
 	}
 	if tFunc.NumIn() > 1 {
-		if requestsClient(tFunc.In(1)) {
+		if tFunc.In(1) == reflect.TypeOf(&stepdef.T{}) {
 			requiredNumParams -= 1
 		}
 	}
@@ -280,6 +267,7 @@ func variableSubstitution(ctx context.Context, s string) (string, error) {
 		return text, err
 	}
 	return envsubst.Eval(text, func(key string) string {
+		key = "scn-var-" + key
 		return store.Load[string](ctx, key)
 	})
 }

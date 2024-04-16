@@ -12,7 +12,7 @@ func Save[T any](ctx context.Context, key string, value T) {
 	storage := ctx.Value(&store{}).(map[string]any)
 
 	storage[key] = value
-	log.FromContext(ctx).V(1).Info("saved %+v to '%s'\n", value, key)
+	log.FromContext(ctx).V(1).Info("Store Saved", "Key", key, "Value", value)
 }
 
 // Load or create new value
@@ -20,12 +20,11 @@ func Load[T any](ctx context.Context, key string) T {
 	storage := ctx.Value(&store{}).(map[string]any)
 
 	var t T
-	log.FromContext(ctx).V(1).Info("loading from '%s' => ", key)
 	if value, exists := storage[key]; exists {
-		log.FromContext(ctx).V(1).Info("found %+v %T\n", value, value)
+		log.FromContext(ctx).V(1).Info("Store Loaded", "Key", key, "Value", value)
 		return value.(T)
 	}
-	log.FromContext(ctx).V(1).Info("did not find\n")
+	log.FromContext(ctx).V(1).Info("Store Loaded", "Key", key, "Value", "NotFound")
 
 	storage[key] = t
 	return t

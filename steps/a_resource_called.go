@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/testernetes/bdk/stepdef"
+	"github.com/testernetes/bdk/store"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -37,7 +38,7 @@ in future steps in the same scenario. JSON and YAML formats are accepted.`,
 	  """`,
 }
 
-var SaveObjectFunc = func(ctx context.Context, out *unstructured.Unstructured, in *unstructured.Unstructured) (err error) {
-	*out = *in.DeepCopy()
+var SaveObjectFunc = func(ctx context.Context, ref string, u *unstructured.Unstructured) error {
+	store.Save(ctx, ref, u)
 	return nil
 }

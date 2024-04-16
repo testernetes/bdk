@@ -12,9 +12,12 @@ var _ = Describe("Store", func() {
 
 	Context("Saving and Loading", Ordered, func() {
 		var ctx context.Context
+		var u *unstructured.Unstructured
 
 		BeforeAll(func() {
 			ctx = context.Background()
+			u = &unstructured.Unstructured{}
+			u.SetName("me")
 		})
 
 		It("should initialize a store into a ctx", func() {
@@ -23,16 +26,21 @@ var _ = Describe("Store", func() {
 		})
 
 		It("should save into a ctx", func() {
-			Save(ctx, "obj", &unstructured.Unstructured{})
+			Save(ctx, "obj", u)
 			Expect(ctx.Value(&store{})).Should(Equal(map[string]any{
-				"*unstructured.Unstructured obj": &unstructured.Unstructured{},
+				"obj": u,
 			}))
 		})
 
 		It("should load from a ctx", func() {
-			var u *unstructured.Unstructured
-			u = Load[*unstructured.Unstructured](ctx, "obj")
-			Expect(u).Should(Equal(&unstructured.Unstructured{}))
+			u := Load[*unstructured.Unstructured](ctx, "obj")
+			Expect(u.GetName()).Should(Equal("me"))
+			u.SetName("bar")
+		})
+
+		It("should load from a ctx", func() {
+			u := Load[*unstructured.Unstructured](ctx, "obj")
+			Expect(u.GetName()).Should(Equal("bar"))
 		})
 	})
 
