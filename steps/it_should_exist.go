@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
 	"github.com/testernetes/bdk/stepdef"
-	"github.com/testernetes/gkube"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -15,10 +15,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var AsyncAssertFunc = func(ctx context.Context, t *stepdef.T, assert stepdef.Assert, timeout time.Duration, ref *unstructured.Unstructured, jsonpath string, desiredMatch bool, matcher types.GomegaMatcher) (err error) {
+var AsyncExistFunc = func(ctx context.Context, t *stepdef.T, assert stepdef.Assert, timeout time.Duration, ref *unstructured.Unstructured, desiredMatch bool) (err error) {
+	not := !desiredMatch
 
-	matcher = gkube.HaveJSONPath(jsonpath, matcher)
 	deadline := time.After(timeout)
+
+	err = t.Client.Get(ctx, client.ObjectKeyFromObject(ref), ref)
+	if k8sErrors.IsNotFound(err) && !not {
+		assert(not, gomega.BeNil(), ref)
+	}
 
 	i, err := t.Client.Watch(ctx, ref, client.InNamespace(ref.GetNamespace()))
 	if err != nil {
@@ -49,7 +54,7 @@ var AsyncAssertFunc = func(ctx context.Context, t *stepdef.T, assert stepdef.Ass
 				continue
 			}
 			var retry bool
-			retry, err = assert(desiredMatch, matcher, event.Object)
+			retry, err = assert(not, gomega.BeNil(), event.Object)
 			if !retry {
 				return err
 			}
@@ -60,9 +65,9 @@ var AsyncAssertFunc = func(ctx context.Context, t *stepdef.T, assert stepdef.Ass
 	}
 }
 
-var AsyncAssertWithTimeout = stepdef.StepDefinition{
-	Name: "it-should-object-duration",
-	Text: "^{assertion} {duration} {reference} jsonpath {jsonpath} {should|should not} {matcher}$",
+var AsyncExistWithTimeout = stepdef.StepDefinition{
+	Name: "it-should-exist-duration",
+	Text: "^{assertion} {duration} {reference} {should|should not} exist$",
 	Help: `Asserts that the referenced resource will satisfy the matcher in the specified duration`,
 	Examples: `
 		Given a resource called cm:
@@ -74,12 +79,12 @@ var AsyncAssertWithTimeout = stepdef.StepDefinition{
 		    namespace: default
 		  """
 		And I create cm
-		Then within 1s cm jsonpath '{.metadata.uid}' should not be empty`,
+		Then within 1s cm should exist`,
 	StepArg:  stepdef.NoStepArg,
-	Function: AsyncAssertFunc,
+	Function: AsyncExistFunc,
 }
 
-var AsyncAssert = stepdef.StepDefinition{
+var AsyncExist = stepdef.StepDefinition{
 	Name: "it-should-object",
 	Text: "^{reference} jsonpath {jsonpath} {should|should not} {matcher}$",
 	Help: `Asserts that the referenced resource will satisfy the matcher`,
@@ -93,9 +98,9 @@ var AsyncAssert = stepdef.StepDefinition{
 		    namespace: default
 		  """
 		And I create cm
-		Then cm jsonpath '{.metadata.uid}' should not be empty`,
+		Then cm should exist`,
 	StepArg: stepdef.NoStepArg,
 	Function: func(ctx context.Context, t *stepdef.T, ref *unstructured.Unstructured, jsonpath string, desiredMatch bool, matcher types.GomegaMatcher) (err error) {
-		return AsyncAssertFunc(ctx, t, stepdef.Eventually, time.Second, ref, jsonpath, desiredMatch, matcher)
+		return AsyncExistFunc(ctx, t, stepdef.Eventually, time.Second, ref, desiredMatch)
 	},
 }

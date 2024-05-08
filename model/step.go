@@ -37,7 +37,6 @@ func (s *StepRunner) Run() (result stepdef.StepResult, err error) {
 			return
 		}
 
-		result = s.Helper.GetResult()
 		result.StartTime = startTime
 		result.EndTime = endTime
 
@@ -46,13 +45,15 @@ func (s *StepRunner) Run() (result stepdef.StepResult, err error) {
 			result.Messages = append(result.Messages, "Step canceled")
 			return
 		}
+
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			result.Result = stepdef.Timedout
 			result.Messages = append(result.Messages, "Step timedout")
 			return
 		}
 
-		if err, ok := ret[0].Interface().(error); ok {
+		var ok bool
+		if err, ok = ret[0].Interface().(error); ok {
 			result.Result = stepdef.Failed
 			result.Messages = append(result.Messages, "Step failed")
 			result.Err = err
@@ -61,5 +62,6 @@ func (s *StepRunner) Run() (result stepdef.StepResult, err error) {
 	}()
 
 	ret = s.Func.Call(s.Args)
+	result = s.Helper.GetResult()
 	return
 }

@@ -37,7 +37,7 @@ var CreateOptions = dataTableArgument{
 
 		Create Options:
 		| DryRun       | string  |
-		| FieldManager | string  |`,
+		| FieldOwner | string  |`,
 	parser: ParseClientOptions,
 }
 
@@ -87,7 +87,7 @@ var PatchOptions = dataTableArgument{
 
 		Patch Options:
 		| DryRun       | string |
-		| FieldManager | string |
+		| FieldOwner | string |
 		| Force        | string |`,
 	parser: ParseClientOptions,
 }

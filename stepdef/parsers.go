@@ -137,8 +137,8 @@ func parseSelector(ctx context.Context, s string) (reflect.Value, error) {
 }
 
 func unmarshal[T any](ctx context.Context, s string) (reflect.Value, error) {
-	var t *T
-	err := yaml.Unmarshal([]byte(s), t)
+	var t T
+	err := yaml.Unmarshal([]byte(s), &t)
 	return reflect.ValueOf(t), err
 }
 

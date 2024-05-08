@@ -39,16 +39,16 @@ func (ch *Events) FinishScenario(scenario *Scenario) {
 	*ch <- Event{Type: FinishScenario, Scenario: scenario}
 }
 
-func (ch *Events) StartStep(scenario *Scenario, step *messages.Step) {
-	*ch <- Event{Type: StartStep, Scenario: scenario, Step: step}
+func (ch *Events) StartStep(step *messages.Step) {
+	*ch <- Event{Type: StartStep, Step: step}
 }
 
 func (ch *Events) InProgressStep(step *messages.Step, result stepdef.StepResult) {
 	*ch <- Event{Type: InProgressStep, Step: step, StepResult: result}
 }
 
-func (ch *Events) FinishStep(scenario *Scenario, step *messages.Step) {
-	*ch <- Event{Type: FinishStep, Scenario: scenario, Step: step}
+func (ch *Events) FinishStep(step *messages.Step, result stepdef.StepResult) {
+	*ch <- Event{Type: FinishStep, Step: step, StepResult: result}
 }
 
 type Event struct {

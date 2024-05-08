@@ -83,7 +83,10 @@ func ParseClientOptions(ctx context.Context, dt *messages.DataTable, targetType 
 		}
 
 		key := r.Cells[0].Value
-		clientOption := clientOptions[key]
+		clientOption, ok := clientOptions[key]
+		if !ok {
+			return reflect.Value{}, fmt.Errorf("%s is not a valid client option", key)
+		}
 		if !clientOption.Implements(targetType) {
 			return reflect.Value{}, fmt.Errorf("%s is not a valid option for %s", key, targetType.String())
 		}

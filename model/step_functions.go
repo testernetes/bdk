@@ -4,8 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
+	"os"
 	"reflect"
 	"regexp"
+	"strings"
+	"time"
 
 	messages "github.com/cucumber/messages/go/v21"
 	"github.com/drone/envsubst"
@@ -45,6 +49,8 @@ func init() {
 		steps.IGet,
 		steps.IPatch,
 		steps.IProxyGet,
+		steps.ISetVar,
+		steps.ISetVarFromJSONPath,
 		steps.AsyncAssertExec,
 		steps.AsyncAssertExecWithTimeout,
 		steps.AsyncAssertLog,
@@ -261,13 +267,28 @@ func validateFunction(vFunc reflect.Value) error {
 	return nil
 }
 
+var letters = []rune("abcdefghijklmnopqrstuvwxyz0123456789")
+
 func variableSubstitution(ctx context.Context, s string) (string, error) {
-	text, err := envsubst.EvalEnv(s)
-	if err != nil {
-		return text, err
-	}
-	return envsubst.Eval(text, func(key string) string {
-		key = "scn-var-" + key
-		return store.Load[string](ctx, key)
+	return envsubst.Eval(s, func(key string) string {
+		val := store.Load[string](ctx, "scn-var-"+key)
+		if val == "" {
+			val = os.Getenv(key)
+		}
+		if val == "" {
+			if key == strings.Repeat("X", len(key)) {
+				val = randChars(len(key))
+			}
+		}
+		return val
 	})
+}
+
+func randChars(c int) string {
+	rand.Seed(time.Now().Unix())
+	b := make([]rune, c)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
 }

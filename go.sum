@@ -577,8 +577,6 @@ github.com/subosito/gotenv v1.6.0 h1:9NlTDc1FTs4qu0DDq7AEtTPNw6SVm7uBMsUCUjABIf8
 github.com/subosito/gotenv v1.6.0/go.mod h1:Dk4QP5c2W3ibzajGcXpNraDfq2IrhjMIvMSWPKKo0FU=
 github.com/testernetes/gkube v0.0.0-20230728143424-3c481587a195 h1:ilWcgEOEIFSoixfRBEo0YSiO4XKhJw0A0QSpYkvJ5ic=
 github.com/testernetes/gkube v0.0.0-20230728143424-3c481587a195/go.mod h1:tmAKSxXux5gGSVKjmHSQ6xEKw9ITjjIY5upQ8xU8hNo=
-github.com/testernetes/trackedclient v0.0.0-20240409081120-ee43dd8776ff h1:w+iQLHrttNNUMrSdDqxD7RTM3Oaa3R7cVWLFI/MdHQQ=
-github.com/testernetes/trackedclient v0.0.0-20240409081120-ee43dd8776ff/go.mod h1:VIuHX2PNJJtd7F0TDO6Vcz1ANQWANFgVQrQbd36wxfU=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20201229170055-e5319fda7802/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20220101234140-673ab2c3ae75/go.mod h1:KO6IkyS8Y3j8OdNO85qEYBsRPuteD+YciPomcXdrMnk=

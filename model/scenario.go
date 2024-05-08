@@ -40,6 +40,12 @@ func (s *Scenario) Run(ctx context.Context, events *Events) error {
 	store.Save(ctx, "scenario", s)
 
 	var cleanups []func() error
+	var errs error
+	defer func() {
+		for _, cleanup := range cleanups {
+			errors.Join(errs, cleanup())
+		}
+	}()
 
 	for _, step := range s.Background.Steps {
 		res, err := s.evalStep(ctx, events, step)
@@ -59,24 +65,18 @@ func (s *Scenario) Run(ctx context.Context, events *Events) error {
 		cleanups = append(cleanups, res.Cleanup...)
 	}
 
-	var errs error
-	for _, cleanup := range cleanups {
-		errors.Join(errs, cleanup())
-	}
-
 	return errs
 }
 
-func (s *Scenario) evalStep(ctx context.Context, events *Events, step *messages.Step) (stepdef.StepResult, error) {
+func (s *Scenario) evalStep(ctx context.Context, events *Events, step *messages.Step) (res stepdef.StepResult, err error) {
 	store.Save(ctx, "step", step)
 
 	stepFunction, err := StepFunctions.Eval(ctx, step, events)
 	if err != nil {
 		return stepdef.StepResult{}, err
 	}
-
-	events.StartStep(s, step)
-	defer events.FinishStep(s, step)
-
-	return stepFunction.Run()
+	events.StartStep(step)
+	res, err = stepFunction.Run()
+	events.FinishStep(step, res)
+	return
 }

@@ -5,8 +5,12 @@ Feature: basic
     apiVersion: v1
     kind: ConfigMap
     metadata:
-      name: ${TESTING}
+      name: blah
       namespace: default
+    data:
+      test: test
     """
     When I create cm
-    Then within 10s cm jsonpath '{.metadata.name}' should equal ${TESTING}1
+      | FieldOwner | matt |
+    When I set myvar from cm jsonpath '{.data.test}'
+    Then within 1s cm jsonpath '{.data.test}' should equal ${myvar}

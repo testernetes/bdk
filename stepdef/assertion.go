@@ -15,6 +15,27 @@ var (
 	ConsistentlyPhrases = []string{"for", "for at least", "for no less than"}
 )
 
+//type K8sExistMatcher struct {
+//	expected client.Object
+//}
+//
+//func (matcher *K8sExistMatcher) Match(actual interface{}) (success bool, err error) {
+//	length, ok := lengthOf(actual)
+//	if !ok {
+//		return false, fmt.Errorf("BeEmpty matcher expects a string/array/map/channel/slice.  Got:\n%s", format.Object(actual, 1))
+//	}
+//
+//	return length == 0, nil
+//}
+//
+//func (matcher *K8sExistMatcher) FailureMessage(actual interface{}) (message string) {
+//	return format.Message(actual, "to be empty")
+//}
+//
+//func (matcher *K8sExistMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+//	return format.Message(actual, "not to be empty")
+//}
+
 type Assert func(bool, types.GomegaMatcher, any) (bool, error)
 
 func Eventually(desiredMatch bool, matcher types.GomegaMatcher, actual any) (bool, error) {
