@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
 	"github.com/testernetes/bdk/stepdef"
+	"github.com/testernetes/bdk/store"
 )
 
 var GoodStep = stepdef.StepDefinition{
@@ -21,6 +22,7 @@ var GoodStep = stepdef.StepDefinition{
 		}
 		return fmt.Errorf("small string")
 	},
+	StepArg: stepdef.NoStepArg,
 }
 
 var StepWithoutContext = stepdef.StepDefinition{
@@ -32,6 +34,7 @@ var StepWithoutContext = stepdef.StepDefinition{
 		}
 		return fmt.Errorf("small string")
 	},
+	StepArg: stepdef.NoStepArg,
 }
 
 var StepWithoutArgs = stepdef.StepDefinition{
@@ -40,12 +43,14 @@ var StepWithoutArgs = stepdef.StepDefinition{
 	Function: func() error {
 		return nil
 	},
+	StepArg: stepdef.NoStepArg,
 }
 
 var StepWithoutFunc = stepdef.StepDefinition{
 	Name:     "not-a-func",
 	Text:     "a {text}",
 	Function: "notafunction",
+	StepArg:  stepdef.NoStepArg,
 }
 
 var StepWithoutText = stepdef.StepDefinition{}
@@ -56,6 +61,7 @@ var StepTooFewArgs = stepdef.StepDefinition{
 	Function: func(ctx context.Context) error {
 		return nil
 	},
+	StepArg: stepdef.NoStepArg,
 }
 
 var StepTooManyArgs = stepdef.StepDefinition{
@@ -64,6 +70,7 @@ var StepTooManyArgs = stepdef.StepDefinition{
 	Function: func(ctx context.Context, s, b string) error {
 		return nil
 	},
+	StepArg: stepdef.NoStepArg,
 }
 
 var _ = Describe("StepFunctions", func() {
@@ -95,13 +102,17 @@ var _ = Describe("StepFunctions", func() {
 			Expect(sf[0].re).ShouldNot(BeNil())
 			Expect(sf[0].function.Kind()).Should(Equal(reflect.Func))
 
-			step := sf.Eval(ctx, &messages.Step{
+			stepDef := &messages.Step{
 				Text: "a step",
-			})
-			Expect(step).ShouldNot(BeNil())
-			Expect(step.Args).Should(HaveLen(2))
-			Expect(step.Func.Type().NumIn()).Should(Equal(2))
-			ret := step.Func.Call(step.Args)
+			}
+			ctx = store.NewStoreFor(ctx)
+			store.Save(ctx, "step", stepDef)
+			stepFunc, err := sf.Eval(ctx, stepDef, nil)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(stepFunc).ShouldNot(BeNil())
+			Expect(stepFunc.Args).Should(HaveLen(2))
+			Expect(stepFunc.Func.Type().NumIn()).Should(Equal(2))
+			ret := stepFunc.Func.Call(stepFunc.Args)
 			Expect(ret).Should(HaveLen(1))
 			Expect(ret[0].Interface()).Should(Succeed())
 		})
