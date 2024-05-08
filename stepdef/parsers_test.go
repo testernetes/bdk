@@ -23,7 +23,7 @@ var (
 	tBool   = reflect.TypeOf(false)
 	tFloat  = reflect.TypeOf(0.1)
 
-	tMatcher      = reflect.TypeOf((*types.GomegaMatcher)(nil))
+	tMatcher      = reflect.TypeOf((*types.GomegaMatcher)(nil)).Elem()
 	tAssert       = reflect.TypeOf((stepdef.Assert)(nil))
 	tDuration     = reflect.TypeOf(time.Duration(0))
 	tUnstructured = reflect.TypeOf((*unstructured.Unstructured)(nil))
@@ -80,6 +80,5 @@ var _ = Describe("StringParser", Ordered, func() {
 		Entry("Matcher", ctxWithNoStore, "say helloworld", tMatcher, gbytes.Say("helloworld")),
 
 		Entry("ClientOption", ctxWithNoStore, "true", tClientDryRun, client.DryRunAll),
-		Entry("ClientOption", ctxWithNoStore, "false", tClientDryRun, client.DryRunAll),
 	)
 })

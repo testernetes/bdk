@@ -65,6 +65,9 @@ func NewT(ctx context.Context, sd StepDefinition, events StepEvents) *T {
 }
 
 func (t *T) notify() {
+	if t.events == nil {
+		return
+	}
 	t.events.InProgressStep(t.step, t.result)
 }
 
