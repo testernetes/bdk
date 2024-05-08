@@ -2,35 +2,39 @@ package steps
 
 import (
 	"context"
+	"fmt"
 	"time"
 
-	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/contextutils"
-	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/scheme"
+	"github.com/testernetes/bdk/stepdef"
+	"github.com/testernetes/gkube"
 )
 
-func init() {
-	scheme.Default.MustAddToScheme(AsyncAssertResp)
-	scheme.Default.MustAddToScheme(AsyncAssertRespWithTimeout)
-}
+var AsyncAssertRespFunc = func(ctx context.Context, assert stepdef.Assert, timeout time.Duration, s gkube.PodSession, desiredMatch bool, text string) (err error) {
+	defer s.Out.CancelDetects()
 
-var AsyncAssertRespFunc = func(ctx context.Context, phrase string, timeout time.Duration, ref, not, matcher string) (err error) {
-	session := contextutils.LoadSession(ctx, ref)
-	Expect(session).ShouldNot(BeNil(), ErrNoResource, ref)
-
-	matcher = "say " + matcher
-
-	NewStringAsyncAssertion(phrase, session).
-		WithContext(ctx, timeout).
-		ShouldOrShouldNot(not, matcher)
+	retry := true
+	for retry {
+		select {
+		case <-time.After(timeout):
+			if desiredMatch {
+				return fmt.Errorf("did not find '%s' in logs:\n%s", text, s.Out.Contents())
+			}
+		case <-ctx.Done():
+			return
+		case <-s.Buffer().Detect(text):
+			if desiredMatch {
+				return nil
+			}
+			return fmt.Errorf("found '%s' in logs:\n%s", text, s.Out.Contents())
+		}
+	}
 
 	return nil
 }
 
-var AsyncAssertRespWithTimeout = scheme.StepDefinition{
+var AsyncAssertRespWithTimeout = stepdef.StepDefinition{
 	Name: "it-should-resp-duration",
-	Text: "<assertion> <duration> <reference> response (should|should not) say <text>",
+	Text: "^{assertion} {duration} {reference} response {should|should not} say {text}$",
 	Help: `Asserts that the referenced pod session has responded with something within the specified duration`,
 	Examples: `
 		Given a resource called sleeping-pod:
@@ -52,13 +56,13 @@ var AsyncAssertRespWithTimeout = scheme.StepDefinition{
 		When I create my-api
 		And I proxy get http://my-app:8000/fake
 		Then within 30s my-api response should say hello`,
-	Parameters: []parameters.Parameter{parameters.AsyncAssertionPhrase, parameters.Duration, parameters.Reference, parameters.ShouldOrShouldNot, parameters.Text},
-	Function:   AsyncAssertRespFunc,
+	StepArg:  stepdef.NoStepArg,
+	Function: AsyncAssertRespFunc,
 }
 
-var AsyncAssertResp = scheme.StepDefinition{
+var AsyncAssertResp = stepdef.StepDefinition{
 	Name: "it-should-resp",
-	Text: "<reference> response (should|should not) say <text>",
+	Text: "^{reference} response {should|should not} say {text}$",
 	Help: `Asserts that the referenced pod session has logged something`,
 	Examples: `
 		Given a resource called sleeping-pod:
@@ -80,8 +84,8 @@ var AsyncAssertResp = scheme.StepDefinition{
 		When I create my-api
 		And I proxy get http://my-app:8000/fake
 		Then within 30s my-api response should say hello`,
-	Parameters: []parameters.Parameter{parameters.Reference, parameters.ShouldOrShouldNot, parameters.Text},
-	Function: func(ctx context.Context, ref, not, matcher string) (err error) {
-		return AsyncAssertRespFunc(ctx, "", time.Second, ref, not, matcher)
+	StepArg: stepdef.NoStepArg,
+	Function: func(ctx context.Context, ref gkube.PodSession, desiredMatch bool, text string) (err error) {
+		return AsyncAssertRespFunc(ctx, stepdef.Eventually, time.Second, ref, desiredMatch, text)
 	},
 }

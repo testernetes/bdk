@@ -3,20 +3,56 @@ package steps
 import (
 	"context"
 
-	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/contextutils"
-	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/scheme"
+	messages "github.com/cucumber/messages/go/v21"
+	"github.com/testernetes/bdk/stepdef"
+	"github.com/testernetes/bdk/store"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func init() {
-	scheme.Default.MustAddToScheme(IPatchAResource)
+var APatch = stepdef.StepDefinition{
+	Name: "a-patch",
+	Text: "^a patch called {reference}$",
+	Help: `A patch which will be applied in a subsequent step`,
+	Examples: `
+	Given a resource called cm:
+	  """
+	  apiVersion: v1
+	  kind: ConfigMap
+	  metadata:
+	    name: example
+	    namespace: default
+	  data:
+	    foo: bar
+	  """
+	And I create cm
+	And a patch called mypatch
+	  """application/merge-patch+json
+          {
+	    "data": {
+	      "foo":"nobar"
+	    }
+	  }
+	  """
+	When I patch cm with mypatch
+	Then cm jsonpath '{.data.foo}' should equal nobar`,
+	StepArg: stepdef.Patch,
+	Function: func(ctx context.Context, ref string, ds *messages.DocString) (err error) {
+		patchType := types.PatchType(ds.MediaType)
+		rawPatch := []byte(ds.Content)
+
+		patch := client.RawPatch(patchType, rawPatch)
+
+		store.Save(ctx, ref, patch)
+
+		return nil
+	},
 }
 
-var IPatchAResource = scheme.StepDefinition{
+var IPatch = stepdef.StepDefinition{
 	Name: "i-patch",
-	Text: "I patch <reference>",
+	Text: "^I patch {reference} with {reference}$",
 	Help: `Patches the referenced resource. Step will fail if the reference was not defined in a previous step.`,
 	Examples: `
 	Given a resource called cm:
@@ -33,19 +69,10 @@ var IPatchAResource = scheme.StepDefinition{
 	When I patch cm
 	  | patch | {"data":{"foo":"nobar"}} |
 	Then for at least 10s cm jsonpath '{.data.foo}' should equal nobar`,
-	Parameters: []parameters.Parameter{parameters.Reference, parameters.PatchOptions},
-	Function: func(ctx context.Context, ref string, opts []client.PatchOption) (err error) {
-		o := contextutils.LoadObject(ctx, ref)
-		Expect(o).ShouldNot(BeNil(), ErrNoResource, ref)
-
-		args := []interface{}{o}
-		for _, opt := range opts {
-			args = append(args, opt)
-		}
-
-		c := contextutils.MustGetClientFrom(ctx)
-		Eventually(c.Patch).WithContext(ctx).WithArguments(args...).Should(Succeed())
-
-		return nil
+	StepArg: stepdef.PatchOptions,
+	Function: func(ctx context.Context, t *stepdef.T, ref *unstructured.Unstructured, patch client.Patch, opts []client.PatchOption) (err error) {
+		return withRetry(ctx, func() error {
+			return t.Client.Patch(ctx, ref, patch, opts...)
+		})
 	},
 }

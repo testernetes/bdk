@@ -2,46 +2,57 @@ package steps
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"time"
 
-	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/contextutils"
-	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/scheme"
-	"github.com/testernetes/gkube"
+	"github.com/onsi/gomega/gbytes"
+	"github.com/testernetes/bdk/stepdef"
 	corev1 "k8s.io/api/core/v1"
 )
 
-func init() {
-	scheme.Default.MustAddToScheme(AsyncAssertLog)
-	scheme.Default.MustAddToScheme(AsyncAssertLogWithTimeout)
-}
-
-var AsyncAssertLogFunc = func(ctx context.Context, phrase string, timeout time.Duration, ref, not, matcher string, opts *corev1.PodLogOptions) (err error) {
-	pod := contextutils.LoadPod(ctx, ref)
-	Expect(pod).ShouldNot(BeNil(), ErrNoResource, ref)
-
-	//out, errOut := writer.From(ctx)
-
-	var s *gkube.PodSession
-	c := contextutils.MustGetClientFrom(ctx)
-	NewStringAsyncAssertion("", func() error {
-		s, err = c.Logs(ctx, pod, opts, nil, nil)
+var AsyncAssertLogFunc = func(ctx context.Context, t *stepdef.T, assert stepdef.Assert, timeout time.Duration, pod *corev1.Pod, desiredMatch bool, text string, opts *corev1.PodLogOptions) (err error) {
+	stream, err := t.Clientset.CoreV1().
+		Pods(pod.Namespace).
+		GetLogs(pod.Name, opts).
+		Stream(ctx)
+	if err != nil {
 		return err
-	}).WithContext(ctx, timeout).Should(Succeed())
+	}
 
-	matcher = "say " + matcher
+	s := &PodSession{
+		Out: gbytes.NewBuffer(),
+	}
 
-	NewStringAsyncAssertion(phrase, s).
-		WithContext(ctx, timeout).
-		ShouldOrShouldNot(not, matcher)
+	go func() {
+		defer stream.Close()
+		_, err = io.Copy(s.Out, stream)
+	}()
 
+	defer s.Out.CancelDetects()
+
+	retry := true
+	for retry {
+		select {
+		case <-time.After(timeout):
+			if desiredMatch {
+				return fmt.Errorf("did not find '%s' in logs:\n%s", text, s.Out.Contents())
+			}
+		case <-ctx.Done():
+			return
+		case <-s.Out.Detect(text):
+			if desiredMatch {
+				return nil
+			}
+			return fmt.Errorf("found '%s' in logs:\n%s", text, s.Out.Contents())
+		}
+	}
 	return nil
 }
 
-var AsyncAssertLogWithTimeout = scheme.StepDefinition{
+var AsyncAssertLogWithTimeout = stepdef.StepDefinition{
 	Name: "it-should-log-duration",
-	Text: "<assertion> <duration> <reference> logs (should|should not) say <text>",
+	Text: "^{assertion} {duration} {reference} logs {should|should not} say {text}$",
 	Help: `Asserts that the referenced resource will log something within the specified duration`,
 	Examples: `
 		Given a resource called testernetes:
@@ -64,13 +75,13 @@ var AsyncAssertLogWithTimeout = scheme.StepDefinition{
 		Then within 1m testernetes logs should say Behaviour Driven Kubernetes
 		  | container | bdk   |
 		  | follow    | false |`,
-	Parameters: []parameters.Parameter{parameters.AsyncAssertionPhrase, parameters.Duration, parameters.Reference, parameters.ShouldOrShouldNot, parameters.Text, parameters.PodLogOptions},
-	Function:   AsyncAssertLogFunc,
+	StepArg:  stepdef.PodLogOptions,
+	Function: AsyncAssertLogFunc,
 }
 
-var AsyncAssertLog = scheme.StepDefinition{
+var AsyncAssertLog = stepdef.StepDefinition{
 	Name: "it-should-log",
-	Text: "<reference> logs (should|should not) say <text>",
+	Text: "^{reference} logs {should|should not} say {text}$",
 	Help: `Asserts that the referenced resource will log something within the specified duration`,
 	Examples: `
 		Given a resource called testernetes:
@@ -91,9 +102,9 @@ var AsyncAssertLog = scheme.StepDefinition{
 		  """
 		When I create testernetes
 		Then testernetes logs should say Behaviour Driven Kubernetes`,
-	Parameters: []parameters.Parameter{parameters.Reference, parameters.ShouldOrShouldNot, parameters.Text, parameters.PodLogOptions},
-	Function: func(ctx context.Context, ref, not, matcher string, opts *corev1.PodLogOptions) (err error) {
-		return AsyncAssertLogFunc(ctx, "", time.Second, ref, not, matcher, opts)
+	StepArg: stepdef.PodLogOptions,
+	Function: func(ctx context.Context, t *stepdef.T, pod *corev1.Pod, desiredMatch bool, text string, opts *corev1.PodLogOptions) (err error) {
+		return AsyncAssertLogFunc(ctx, t, stepdef.Eventually, time.Second, pod, desiredMatch, text, opts)
 	},
 }
 
@@ -102,7 +113,7 @@ var AsyncAssertLog = scheme.StepDefinition{
 // TODO maybe embed podLogOptions in DocString
 //var AsyncAssertLogWithTimeoutMultiline = scheme.StepDefinition{
 //	Name: "it-should-log-duration-multiline",
-//	Text: "<assertion> <duration> <reference> logs (should|should not) say",
+//	Text: "{assertion} {duration} {reference} logs (should|should not) say",
 //	Help: `Assets that the referenced resource will log something within the specified duration`,
 //	Examples: `
 //		Given a resource called bdk:

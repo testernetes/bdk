@@ -3,41 +3,30 @@ package steps
 import (
 	"context"
 
-	"github.com/testernetes/bdk/contextutils"
-	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/scheme"
+	"github.com/testernetes/bdk/stepdef"
+	"github.com/testernetes/bdk/store"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func init() {
-	scheme.Default.MustAddToScheme(AResource)
-	scheme.Default.MustAddToScheme(AResourceFromFile)
-}
-
-var SaveObjectFunc = func(ctx context.Context, ref string, manifest *unstructured.Unstructured) (err error) {
-	contextutils.SaveObject(ctx, ref, manifest)
-
-	return nil
-}
-
-var AResourceFromFile = scheme.StepDefinition{
-	Name: "a-resource-from-file",
-	Text: `a <reference> from <filename>`,
+var AResourceFromFile = stepdef.StepDefinition{
+	Name:     "a-resource-from-file",
+	Text:     "^a {reference} from {filename}$",
+	Function: SaveObjectFunc,
+	StepArg:  stepdef.NoStepArg,
 	Help: `Assigns a reference to the resource given in the filename. This reference can be referred to
 in future steps in the same scenario. JSON and YAML formats are accepted.`,
 	Examples: `
 	Given cm from config.yaml:`,
-	Parameters: []parameters.Parameter{parameters.Reference, parameters.Filename},
-	Function:   SaveObjectFunc,
 }
 
-var AResource = scheme.StepDefinition{
-	Name: "a-resource",
-	Text: `a resource called <reference>`,
+var AResource = stepdef.StepDefinition{
+	Name:     "a-resource",
+	Text:     "^a resource called {reference}$",
+	Function: SaveObjectFunc,
+	StepArg:  stepdef.Manifest,
 	Help: `Assigns a reference to the resource given in the DocString. This reference can be referred to
 in future steps in the same scenario. JSON and YAML formats are accepted.`,
-	Examples: `
-	Given a resource called cm:
+	Examples: `Given a resource called cm:
 	  """
 	  apiVersion: v1
 	  kind: ConfigMap
@@ -47,6 +36,9 @@ in future steps in the same scenario. JSON and YAML formats are accepted.`,
 	  data:
 	    foo: bar
 	  """`,
-	Parameters: []parameters.Parameter{parameters.Reference, parameters.Manifest},
-	Function:   SaveObjectFunc,
+}
+
+var SaveObjectFunc = func(ctx context.Context, ref string, u *unstructured.Unstructured) error {
+	store.Save(ctx, ref, u)
+	return nil
 }

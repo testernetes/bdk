@@ -3,34 +3,23 @@ package steps
 import (
 	"context"
 
-	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/contextutils"
-	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/scheme"
+	"github.com/testernetes/bdk/stepdef"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func init() {
-	scheme.Default.MustAddToScheme(IGetAResource)
-}
-
-var IGetAResource = scheme.StepDefinition{
+var IGet = stepdef.StepDefinition{
 	Name: "i-get",
-	Text: "I get <reference>",
+	Text: "^I get {reference}$",
 	Help: `Gets the referenced resource. Step will fail if the reference was not defined in a previous step.`,
 	Examples: `
 	Given a cm from file blah.yaml
 	And I get cm
 	Then cm jsonpath '{.metadata.uid}' should not be empty`,
-	Parameters: []parameters.Parameter{parameters.Reference},
-	Function: func(ctx context.Context, ref string) error {
-		o := contextutils.LoadObject(ctx, ref)
-		Expect(o).ShouldNot(BeNil(), ErrNoResource, ref)
-
-		c := contextutils.MustGetClientFrom(ctx)
-		Expect(c.Get(ctx, o)).Should(Succeed(), "Failed to create resource")
-
-		contextutils.SaveObject(ctx, ref, o)
-
-		return nil
+	StepArg: stepdef.NoStepArg,
+	Function: func(ctx context.Context, t *stepdef.T, ref *unstructured.Unstructured) error {
+		return t.WithRetry(ctx, func() error {
+			return t.Client.Get(ctx, client.ObjectKeyFromObject(ref), ref)
+		}, stepdef.RetryK8sError)
 	},
 }

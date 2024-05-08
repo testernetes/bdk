@@ -2,80 +2,81 @@ package model
 
 import (
 	"context"
+	"errors"
 
 	messages "github.com/cucumber/messages/go/v21"
-	"github.com/testernetes/bdk/contextutils"
-	"github.com/testernetes/bdk/scheme"
-	"github.com/testernetes/gkube"
-	"github.com/testernetes/trackedclient"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"github.com/testernetes/bdk/stepdef"
+	"github.com/testernetes/bdk/store"
 )
 
 type Scenario struct {
-	Location    *messages.Location   `json:"location"`
-	Tags        []*messages.Tag      `json:"tags"`
-	Keyword     string               `json:"keyword"`
-	Name        string               `json:"name"`
-	Description string               `json:"description"`
+	*messages.Scenario
 	Background  *messages.Background `json:"background"`
-	Steps       []*Step              `json:"steps"`
-	//Examples    []*Examples        `json:"examples"`
+	StepResults map[*messages.Step]stepdef.StepResult
 }
 
-func NewScenario(bkg *messages.Background, scn *messages.Scenario, scheme *scheme.Scheme) (*Scenario, error) {
+func (s *Scenario) MarshalJSON() ([]byte, error) {
+	return []byte(`"soon"`), nil
+}
+
+func NewScenario(bkg *messages.Background, scn *messages.Scenario) (*Scenario, error) {
 	if bkg == nil {
 		bkg = &messages.Background{}
 	}
 	s := &Scenario{
-		Location:   scn.Location,
-		Tags:       scn.Tags,
-		Keyword:    scn.Keyword,
-		Name:       scn.Name,
-		Background: bkg,
+		Scenario:    scn,
+		Background:  bkg,
+		StepResults: make(map[*messages.Step]stepdef.StepResult),
 	}
-
-	bkgSteps, err := NewSteps(bkg.Steps, scheme)
-	if err != nil {
-		return s, err
-	}
-	scnSteps, err := NewSteps(scn.Steps, scheme)
-	if err != nil {
-		return s, err
-	}
-	s.Steps = append(bkgSteps, scnSteps...)
-
 	return s, nil
 }
 
-func (s *Scenario) Run(ctx context.Context) bool {
-	// add to ctx
-	// * Helper
-	tc, err := trackedclient.New(config.GetConfigOrDie(), client.Options{})
-	if err != nil {
-		panic(err)
-	}
-	ctx = contextutils.NewClientFor(ctx, gkube.WithClient(tc))
-	// * Register
-	ctx = contextutils.NewRegisterFor(ctx)
-	// * PodSessions
-	ctx = contextutils.NewPodSessionsFor(ctx)
-	// * PortForwarders
-	// * out and errOut Writers
-	for _, step := range s.Steps {
-		step.Run(ctx)
-		if step.Execution.Result != Passed {
-			return false
+func (s *Scenario) Run(ctx context.Context, events *Events) error {
+	events.StartScenario(s)
+	defer events.FinishScenario(s)
+
+	ctx = store.NewStoreFor(ctx)
+
+	store.Save(ctx, "scenario", s)
+
+	var cleanups []func() error
+	var errs error
+	defer func() {
+		for _, cleanup := range cleanups {
+			errors.Join(errs, cleanup())
 		}
+	}()
+
+	for _, step := range s.Background.Steps {
+		res, err := s.evalStep(ctx, events, step)
+		if err != nil {
+			return err
+		}
+		s.StepResults[step] = res
+		cleanups = append(cleanups, res.Cleanup...)
 	}
-	tc.DeleteAllTracked(ctx)
-	return true
+
+	for _, step := range s.Steps {
+		res, err := s.evalStep(ctx, events, step)
+		if err != nil {
+			return err
+		}
+		s.StepResults[step] = res
+		cleanups = append(cleanups, res.Cleanup...)
+	}
+
+	return errs
 }
 
-type Background struct {
-	Location    *messages.Location `json:"location"`
-	Keyword     string             `json:"keyword"`
-	Name        string             `json:"name"`
-	Description string             `json:"description"`
-	Steps       []*Step            `json:"steps"`
+func (s *Scenario) evalStep(ctx context.Context, events *Events, step *messages.Step) (res stepdef.StepResult, err error) {
+	store.Save(ctx, "step", step)
+
+	stepFunction, err := StepFunctions.Eval(ctx, step, events)
+	if err != nil {
+		return stepdef.StepResult{}, err
+	}
+	events.StartStep(step)
+	res, err = stepFunction.Run()
+	events.FinishStep(step, res)
+	return
 }

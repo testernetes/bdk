@@ -2,98 +2,128 @@ package steps
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 
-	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/arguments"
-	"github.com/testernetes/bdk/contextutils"
-	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/scheme"
-	"github.com/testernetes/gkube"
+	messages "github.com/cucumber/messages/go/v21"
+	"github.com/onsi/gomega/gbytes"
+	"github.com/testernetes/bdk/stepdef"
+	"github.com/testernetes/bdk/store"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/remotecommand"
+	k8sExec "k8s.io/utils/exec"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
-func init() {
-	scheme.Default.AddToScheme(IExecInContainer)
-	scheme.Default.AddToScheme(IExecInDefaultContainer)
-	scheme.Default.AddToScheme(IExecScriptInContainer)
-	scheme.Default.AddToScheme(IExecScriptInDefaultContainer)
+type PodSession struct {
+	Out      *gbytes.Buffer
+	Err      *gbytes.Buffer
+	ExitCode int
 }
 
-var IExecFunc = func(ctx context.Context, cmd []string, ref, container string) error {
-	pod := contextutils.LoadPod(ctx, ref)
-	Expect(pod).ShouldNot(BeNil(), ErrNoResource, ref)
+var IExecFunc = func(ctx context.Context, t *stepdef.T, cmd []string, pod *corev1.Pod, container string) error {
+	podExecOpts := &corev1.PodExecOptions{
+		Stdout:    true,
+		Stderr:    true,
+		Stdin:     false,
+		TTY:       false,
+		Container: container,
+		Command:   cmd,
+	}
 
-	//out, errOut := writer.From(ctx)
+	execReq := t.Clientset.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Name(pod.Name).
+		Namespace(pod.Namespace).
+		SubResource("exec").
+		VersionedParams(podExecOpts, scheme.ParameterCodec)
 
-	var s *gkube.PodSession
-	c := contextutils.MustGetClientFrom(ctx)
-	Eventually(func() error {
-		var err error
-		s, err = c.Exec(ctx, pod, container, cmd, nil, nil)
+	executor, err := remotecommand.NewSPDYExecutor(config.GetConfigOrDie(), http.MethodPost, execReq.URL())
+	if err != nil {
 		return err
-	}).WithContext(ctx).Should(Succeed(), "Could not exec in container")
+	}
 
-	contextutils.SaveSession(ctx, ref, s)
+	session := &PodSession{
+		Out: &gbytes.Buffer{},
+		Err: &gbytes.Buffer{},
+	}
+	defer session.Out.Close()
+	defer session.Err.Close()
 
-	return nil
+	streamOpts := remotecommand.StreamOptions{
+		Stdout: session.Out,
+		Stderr: session.Err,
+	}
+	err = executor.StreamWithContext(ctx, streamOpts)
+	if err != nil {
+		fmt.Fprintf(session.Err, err.Error())
+		if exitcode, ok := err.(k8sExec.CodeExitError); ok {
+			session.ExitCode = exitcode.Code
+		}
+	}
+	store.Save(ctx, client.ObjectKeyFromObject(pod).String(), session)
+	return err
 }
 
-var IExecScriptFunc = func(ctx context.Context, ref, container string, script *arguments.DocString) error {
+var IExecScriptFunc = func(ctx context.Context, t *stepdef.T, pod *corev1.Pod, container string, script *messages.DocString) error {
 	shell := script.MediaType
 	if shell == "" {
 		shell = "/bin/sh"
 	}
 	cmd := script.Content
-	return IExecFunc(ctx, []string{shell, "-c", cmd}, ref, container)
+	return IExecFunc(ctx, t, []string{shell, "-c", cmd}, pod, container)
 }
 
-var IExecInContainer = scheme.StepDefinition{
+var IExecInContainer = stepdef.StepDefinition{
 	Name: "i-exec-in-container",
-	Text: "I exec <command> in <reference>/<container>",
+	Text: "^I exec {command} in {reference}/{container}$",
 	Help: "Executes the given command in a shell in the referenced pod and container.",
 	Examples: `
 	When I exec "echo helloworld" in pod/app`,
-	Parameters: []parameters.Parameter{parameters.Command, parameters.Reference, parameters.Container},
-	Function: func(ctx context.Context, cmd string, ref, container string) error {
-		return IExecFunc(ctx, []string{"/bin/sh", "-c", cmd}, ref, container)
+	StepArg: stepdef.NoStepArg,
+	Function: func(ctx context.Context, t *stepdef.T, cmd string, pod *corev1.Pod, container string) error {
+		return IExecFunc(ctx, t, []string{"/bin/sh", "-c", cmd}, pod, container)
 	},
 }
 
-var IExecInDefaultContainer = scheme.StepDefinition{
+var IExecInDefaultContainer = stepdef.StepDefinition{
 	Name: "i-exec",
-	Text: "I exec <command> in <reference>",
+	Text: "^I exec {command} in {reference}$",
 	Help: "Executes the given command in a shell in the referenced pod and default container.",
 	Examples: `
 	When I exec "echo helloworld" in pod`,
-	Parameters: []parameters.Parameter{parameters.Command, parameters.Reference},
-	Function: func(ctx context.Context, cmd, ref string) error {
-		return IExecFunc(ctx, []string{"/bin/sh", "-c", cmd}, ref, "")
+	StepArg: stepdef.NoStepArg,
+	Function: func(ctx context.Context, t *stepdef.T, cmd string, pod *corev1.Pod) error {
+		return IExecFunc(ctx, t, []string{"/bin/sh", "-c", cmd}, pod, "")
 	},
 }
 
-var IExecScriptInContainer = scheme.StepDefinition{
+var IExecScriptInContainer = stepdef.StepDefinition{
 	Name: "i-exec-script-in-container",
-	Text: "I exec this script in <reference>/<container>",
+	Text: "^I exec this script in {reference}/{container}$",
 	Help: "Executes the given script in a shell in the referenced pod and container.",
 	Examples: `
 	When I exec this script in pod/app
 	  """/bin/bash
 	  curl localhost:8080/ready
 	  """`,
-	Parameters: []parameters.Parameter{parameters.Command, parameters.Reference, parameters.Container, parameters.Script},
-	Function:   IExecScriptFunc,
+	StepArg:  stepdef.Script,
+	Function: IExecScriptFunc,
 }
 
-var IExecScriptInDefaultContainer = scheme.StepDefinition{
+var IExecScriptInDefaultContainer = stepdef.StepDefinition{
 	Name: "i-exec-script",
-	Text: "I exec this script in <reference>",
+	Text: "^I exec this script in {reference}$",
 	Help: "Executes the given script in a shell in the referenced pod and default container.",
 	Examples: `
 	When I exec this script in pod
 	  """/bin/bash
 	  curl localhost:8080/ready
 	  """`,
-	Parameters: []parameters.Parameter{parameters.Command, parameters.Reference, parameters.Script},
-	Function: func(ctx context.Context, ref string, script *arguments.DocString) error {
-		return IExecScriptFunc(ctx, ref, "", script)
+	StepArg: stepdef.Script,
+	Function: func(ctx context.Context, t *stepdef.T, pod *corev1.Pod, script *messages.DocString) error {
+		return IExecScriptFunc(ctx, t, pod, "", script)
 	},
 }

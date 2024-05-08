@@ -4,34 +4,29 @@ import (
 	"context"
 	"time"
 
-	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/contextutils"
-	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/scheme"
-	corev1 "k8s.io/api/core/v1"
+	"github.com/onsi/gomega/gbytes"
+	"github.com/testernetes/bdk/stepdef"
+	"github.com/testernetes/bdk/store"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func init() {
-	scheme.Default.MustAddToScheme(AsyncAssertExec)
-	scheme.Default.MustAddToScheme(AsyncAssertExecWithTimeout)
-}
+var AsyncAssertExecFunc = func(ctx context.Context, assert stepdef.Assert, timeout time.Duration, ref *unstructured.Unstructured, desiredMatch bool, text string) (err error) {
 
-var AsyncAssertExecFunc = func(ctx context.Context, phrase string, timeout time.Duration, ref, not, matcher string, opts *corev1.PodLogOptions) (err error) {
-	session := contextutils.LoadSession(ctx, ref)
-	Expect(session).ShouldNot(BeNil(), ErrNoResource, ref)
+	session := store.Load[PodSession](ctx, client.ObjectKeyFromObject(ref).String())
+	matcher := gbytes.Say(text)
 
-	matcher = "say " + matcher
-
-	NewStringAsyncAssertion(phrase, session).
-		WithContext(ctx, timeout).
-		ShouldOrShouldNot(not, matcher)
+	_, err = assert(desiredMatch, matcher, session.Out)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
-var AsyncAssertExecWithTimeout = scheme.StepDefinition{
+var AsyncAssertExecWithTimeout = stepdef.StepDefinition{
 	Name: "it-should-exec-duration",
-	Text: "<assertion> <duration> <reference> exec (should|should not) say <text>",
+	Text: "^{assertion} {duration} {reference} exec {should|should not} say {text}$",
 	Help: `Asserts that the referenced pod session has logged something within the specified duration`,
 	Examples: `
 		Given a resource called sleeping-pod:
@@ -53,13 +48,13 @@ var AsyncAssertExecWithTimeout = scheme.StepDefinition{
 		When I create sleeping-pod
 		And I exec "echo hello" in sleeping-pod/busybox
 		Then within 30s sleeping-pod exec should say hello`,
-	Parameters: []parameters.Parameter{parameters.AsyncAssertionPhrase, parameters.Duration, parameters.Reference, parameters.ShouldOrShouldNot, parameters.Text, parameters.PodLogOptions},
-	Function:   AsyncAssertExecFunc,
+	StepArg:  stepdef.NoStepArg,
+	Function: AsyncAssertExecFunc,
 }
 
-var AsyncAssertExec = scheme.StepDefinition{
+var AsyncAssertExec = stepdef.StepDefinition{
 	Name: "it-should-exec",
-	Text: "<reference> exec (should|should not) say <text>",
+	Text: "^{reference} exec {should|should not} say {text}$",
 	Help: `Asserts that the referenced pod session has logged something`,
 	Examples: `
 		Given a resource called sleeping-pod:
@@ -81,8 +76,8 @@ var AsyncAssertExec = scheme.StepDefinition{
 		When I create sleeping-pod
 		And I exec "echo hello" in sleeping-pod/busybox
 		Then sleeping-pod exec should say hello`,
-	Parameters: []parameters.Parameter{parameters.Reference, parameters.ShouldOrShouldNot, parameters.Text, parameters.PodLogOptions},
-	Function: func(ctx context.Context, ref, not, matcher string, opts *corev1.PodLogOptions) (err error) {
-		return AsyncAssertExecFunc(ctx, "", time.Second, ref, not, matcher, opts)
+	StepArg: stepdef.NoStepArg,
+	Function: func(ctx context.Context, ref *unstructured.Unstructured, desiredMatch bool, matcher string) (err error) {
+		return AsyncAssertExecFunc(ctx, stepdef.Eventually, time.Second, ref, desiredMatch, matcher)
 	},
 }

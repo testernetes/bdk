@@ -1,6 +1,6 @@
 Feature: Logging
   Scenario: BDK Should assert on container logs
-    Given a resource called pod:
+    Given a resource called pod
     """yaml
     apiVersion: v1
     kind: Pod

@@ -3,20 +3,14 @@ package steps
 import (
 	"context"
 
-	. "github.com/onsi/gomega"
-	"github.com/testernetes/bdk/contextutils"
-	"github.com/testernetes/bdk/parameters"
-	"github.com/testernetes/bdk/scheme"
+	"github.com/testernetes/bdk/stepdef"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func init() {
-	scheme.Default.MustAddToScheme(ICreateAResource)
-}
-
-var ICreateAResource = scheme.StepDefinition{
+var ICreate = stepdef.StepDefinition{
 	Name: "i-create",
-	Text: "I create <reference>",
+	Text: "^I create {reference}$",
 	Help: `Creates the referenced resource. Step will fail if the reference was not defined in a previous step.`,
 	Examples: `
 	Given a resource called cm:
@@ -32,19 +26,18 @@ var ICreateAResource = scheme.StepDefinition{
 	And I create cm
 	  | field manager | example |
 	Then within 1s cm jsonpath '{.metadata.uid}' should not be empty`,
-	Parameters: []parameters.Parameter{parameters.Reference, parameters.CreateOptions},
-	Function: func(ctx context.Context, ref string, opts []client.CreateOption) error {
-		o := contextutils.LoadObject(ctx, ref)
-		Expect(o).ShouldNot(BeNil(), ErrNoResource, ref)
+	StepArg: stepdef.CreateOptions,
+	Function: func(ctx context.Context, t *stepdef.T, reference *unstructured.Unstructured, opts []client.CreateOption) (err error) {
+		err = t.WithRetry(ctx, func() error {
+			return t.Client.Create(ctx, reference, opts...)
+		}, stepdef.RetryK8sError)
 
-		args := []interface{}{o}
-		for _, opt := range opts {
-			args = append(args, opt)
+		if err != nil {
+			return err
 		}
-
-		c := contextutils.MustGetClientFrom(ctx)
-		Eventually(c.Create).WithContext(ctx).WithArguments(args...).Should(Succeed(), "Failed to create resource")
-
-		return nil
+		t.Cleanup(func() error {
+			return t.Client.Delete(ctx, reference)
+		})
+		return
 	},
 }

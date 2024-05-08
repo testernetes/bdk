@@ -1,14 +1,16 @@
 Feature: basic
   Scenario: within 1 second resource creation
-    Given a resource called cm:
+    Given a resource called cm
     """
     apiVersion: v1
     kind: ConfigMap
     metadata:
-      name: example
+      name: blah
       namespace: default
+    data:
+      test: test
     """
     When I create cm
-    Then within 10s cm jsonpath '{.metadata.name}' should equal example
-    And I delete cm
-    | propagation policy | Foreground |
+      | FieldOwner | matt |
+    When I set myvar from cm jsonpath '{.data.test}'
+    Then within 1s cm jsonpath '{.data.test}' should equal ${myvar}

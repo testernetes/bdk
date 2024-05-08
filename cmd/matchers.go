@@ -5,11 +5,9 @@ package cmd
 
 import (
 	"bytes"
-	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/testernetes/bdk/formatters/utils"
-	"github.com/testernetes/bdk/matchers"
+	"github.com/testernetes/bdk/stepdef"
 )
 
 var matcherHelpTemplate = `{{.Long}}
@@ -29,7 +27,7 @@ func NewMatchersCommand() *cobra.Command {
 		Short: "View matchers",
 		Long:  "",
 	}
-	for _, m := range matchers.Matchers {
+	for _, m := range stepdef.Matchers {
 		if m.Name == "" {
 			continue
 		}
@@ -49,17 +47,9 @@ func NewMatchersCommand() *cobra.Command {
 
 func printMatcherParameters(name string) string {
 	buf := bytes.NewBufferString("")
-	for _, m := range matchers.Matchers {
+	for _, m := range stepdef.Matchers {
 		if m.Name == name {
-			for _, p := range m.Parameters {
-				text := p.Text
-				if p.Text == "" {
-					text = "Additional Step Arguments"
-				}
-				fmt.Fprintf(buf, utils.Examples("\n%s:"), text)
-				fmt.Fprintf(buf, utils.Parameter(p.ShortHelp))
-				fmt.Fprintf(buf, utils.Parameter(p.LongHelp))
-			}
+			m.PrintHelp()
 		}
 	}
 	return buf.String()

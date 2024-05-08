@@ -1,4 +1,4 @@
-package model
+package stepdef_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestScheme(t *testing.T) {
+func TestArguments(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "model suite")
+	RunSpecs(t, "arguments suite")
 }
