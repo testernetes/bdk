@@ -95,10 +95,10 @@ var StringParsers = stringParsers{
 
 	//TODO uint uint8 uint16 uint32 uint64 uintptr
 
-	reflect.TypeOf((Assert)(nil)):    parseAssertion,
-	reflect.TypeOf(time.Duration(0)): parseGeneric(time.ParseDuration),
-	//reflect.TypeOf((*unstructured.Unstructured)(nil)): loadFromStore[*unstructured.Unstructured](),
-	//reflect.TypeOf((*corev1.Pod)(nil)):                parsePod,
+	reflect.TypeOf((Assert)(nil)):                      parseAssertion,
+	reflect.TypeOf(time.Duration(0)):                   parseGeneric(time.ParseDuration),
+	reflect.TypeOf((*unstructured.Unstructured)(nil)):  loadFromStore[*unstructured.Unstructured](),
+	reflect.TypeOf((*corev1.Pod)(nil)):                 parsePod,
 	reflect.TypeOf((*types.GomegaMatcher)(nil)).Elem(): Matchers.ParseMatcher,
 
 	reflect.TypeOf(client.DryRunAll):                valueIfTrue(client.DryRunAll),
