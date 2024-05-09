@@ -50,6 +50,7 @@ type T struct {
 }
 
 func NewT(ctx context.Context, sd StepDefinition, events StepEvents) *T {
+	var err error
 	t := &T{
 		events: events,
 		step:   store.Load[*messages.Step](ctx, "step"),
@@ -58,8 +59,11 @@ func NewT(ctx context.Context, sd StepDefinition, events StepEvents) *T {
 		},
 	}
 	t.Log = log.FromContext(ctx).WithName(sd.Name).V(1)
-	t.Client, _ = client.NewWithWatch(config.GetConfigOrDie(), client.Options{})
 	t.Clientset = *kubernetes.NewForConfigOrDie(config.GetConfigOrDie())
+	t.Client, err = client.NewWithWatch(config.GetConfigOrDie(), client.Options{})
+	if err != nil {
+		panic(err)
+	}
 
 	return t
 }

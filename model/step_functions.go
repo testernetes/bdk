@@ -4,15 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
 	"os"
 	"reflect"
 	"regexp"
 	"strings"
-	"time"
+	"text/template"
 
 	messages "github.com/cucumber/messages/go/v21"
 	"github.com/drone/envsubst"
+	"github.com/testernetes/bdk/printers/utils"
 	"github.com/testernetes/bdk/stepdef"
 	"github.com/testernetes/bdk/steps"
 	"github.com/testernetes/bdk/store"
@@ -40,6 +40,7 @@ func init() {
 		steps.AResourceFromFile,
 		steps.APatch,
 		steps.ICreate,
+		steps.ICreateATmpNamespace,
 		steps.IDelete,
 		steps.IEvict,
 		steps.IExecInContainer,
@@ -70,8 +71,45 @@ type stepFunction struct {
 	parameters []stepdef.StringParameter
 }
 
-func (sf stepFunction) GetParameters() []stepdef.StringParameter {
-	return sf.parameters
+var tmpl = `{{ .StepDefinition.Text }}
+
+Step Definitions:
+  {{ .StepDefinition.Help }}
+
+Parameters:
+{{ range parameters }}
+  {{ .Name }}:
+    Regular Expression: {{ .Expression }}
+
+    {{ .Description }}
+
+    {{ .Help }}
+{{ end }}
+Examples:
+
+{{ .StepDefinition.Examples | indent }}
+`
+
+func (sf *stepFunction) PrintHelp() {
+	buf := &strings.Builder{}
+	helpTmpl, err := template.New("help").
+		Funcs(template.FuncMap{
+			"parameters": func() []stepdef.StringParameter {
+				return sf.parameters
+			},
+			"indent": func(s string) string {
+				return utils.NewNormalizer(strings.TrimSpace(s)).IndentTabs(2).String()
+			},
+		}).
+		Parse(tmpl)
+	if err != nil {
+		panic(err)
+	}
+	err = helpTmpl.Execute(buf, sf)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Print(buf.String())
 }
 
 func (sf *stepFunction) Matches(step *messages.Step) bool {
@@ -154,7 +192,7 @@ func (s *stepFunctions) Eval(ctx context.Context, step *messages.Step, events *E
 		}
 	}
 
-	return nil, fmt.Errorf("could not find a matching step")
+	return nil, fmt.Errorf("could not find a matching step definition for: %s", text)
 }
 
 // return just an interface in future
@@ -267,8 +305,6 @@ func validateFunction(vFunc reflect.Value) error {
 	return nil
 }
 
-var letters = []rune("abcdefghijklmnopqrstuvwxyz0123456789")
-
 func variableSubstitution(ctx context.Context, s string) (string, error) {
 	return envsubst.Eval(s, func(key string) string {
 		val := store.Load[string](ctx, "scn-var-"+key)
@@ -277,18 +313,9 @@ func variableSubstitution(ctx context.Context, s string) (string, error) {
 		}
 		if val == "" {
 			if key == strings.Repeat("X", len(key)) {
-				val = randChars(len(key))
+				val = stepdef.RandChars(len(key))
 			}
 		}
 		return val
 	})
-}
-
-func randChars(c int) string {
-	rand.Seed(time.Now().Unix())
-	b := make([]rune, c)
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(b)
 }

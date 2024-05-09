@@ -4,8 +4,6 @@ Copyright © 2023 Matt Simons
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 	"github.com/testernetes/bdk/model"
 )
@@ -55,7 +53,7 @@ func NewStepsCommand() *cobra.Command {
 			},
 		}
 		cmdStep.SetHelpFunc(func(c *cobra.Command, args []string) {
-			fmt.Printf("%+v\n", s)
+			s.PrintHelp()
 		})
 		stepsCmd.AddCommand(cmdStep)
 	}

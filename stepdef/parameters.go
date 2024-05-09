@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	BashChars             = `([a-zA-Z_][a-zA-Z0-9_]*)`
 	RFC1123               = `([a-z0-9]+[-a-z0-9]*[a-z0-9])`
 	DoubleQuoted          = `"([^"\\]*(?:\\.[^"\\]*)*)"`
 	SingleQuoted          = `'([^'\\]*(?:\\.[^'\\]*)*)'`
@@ -263,6 +264,13 @@ func init() {
 		Eventually assertions can be made with: %q
 		Consistently assertions can be made with: %q`, EventuallyPhrases, ConsistentlyPhrases),
 			parser: StringParsers.Parse,
+		},
+		stringParameter{
+			name:        "{var}",
+			expression:  BashChars,
+			description: `A valid bash variable name`,
+			help:        `Must start with a letter or _ and may contain digits.`,
+			parser:      ParseClientObject,
 		},
 		stringParameter{
 			name:        "{reference}",

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"reflect"
 	"strconv"
 	"strings"
@@ -268,4 +269,14 @@ func loadFromStore[T any]() func(context.Context, string) (reflect.Value, error)
 	return func(ctx context.Context, s string) (reflect.Value, error) {
 		return reflect.ValueOf(store.Load[T](ctx, s)), nil
 	}
+}
+
+var letters = []rune("abcdefghijklmnopqrstuvwxyz0123456789")
+
+func RandChars(c int) string {
+	b := make([]rune, c)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
 }

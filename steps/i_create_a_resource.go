@@ -26,18 +26,20 @@ var ICreate = stepdef.StepDefinition{
 	And I create cm
 	  | field manager | example |
 	Then within 1s cm jsonpath '{.metadata.uid}' should not be empty`,
-	StepArg: stepdef.CreateOptions,
-	Function: func(ctx context.Context, t *stepdef.T, reference *unstructured.Unstructured, opts []client.CreateOption) (err error) {
-		err = t.WithRetry(ctx, func() error {
-			return t.Client.Create(ctx, reference, opts...)
-		}, stepdef.RetryK8sError)
+	StepArg:  stepdef.CreateOptions,
+	Function: iCreateFunc,
+}
 
-		if err != nil {
-			return err
-		}
-		t.Cleanup(func() error {
-			return t.Client.Delete(ctx, reference)
-		})
-		return
-	},
+var iCreateFunc = func(ctx context.Context, t *stepdef.T, reference *unstructured.Unstructured, opts []client.CreateOption) (err error) {
+	err = t.WithRetry(ctx, func() error {
+		return t.Client.Create(ctx, reference, opts...)
+	}, stepdef.RetryK8sError)
+
+	if err != nil {
+		return err
+	}
+	t.Cleanup(func() error {
+		return t.Client.Delete(ctx, reference)
+	})
+	return
 }

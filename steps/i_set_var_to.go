@@ -14,7 +14,7 @@ import (
 
 var ISetVar = stepdef.StepDefinition{
 	Name:     "i-set-var",
-	Text:     "^I set {reference} to {text}$",
+	Text:     "^I set {var} to {text}$",
 	Function: SetVarFunc,
 	StepArg:  stepdef.NoStepArg,
 	Help:     `Assigns a value to a variable`,
@@ -22,7 +22,7 @@ var ISetVar = stepdef.StepDefinition{
 
 var ISetVarFromJSONPath = stepdef.StepDefinition{
 	Name:     "i-set-var",
-	Text:     "^I set {reference} from {reference} jsonpath {jsonpath}$",
+	Text:     "^I set {var} from {reference} jsonpath {jsonpath}$",
 	Function: SetVarFromJSONPathFunc,
 	StepArg:  stepdef.NoStepArg,
 	Help:     `Assigns a value to a variable`,
