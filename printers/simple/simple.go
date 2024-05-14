@@ -23,6 +23,12 @@ var colorFor = map[stepdef.Result]color.Attribute{
 }
 
 type Printer struct {
+	linesToClear int
+}
+
+func (p *Printer) clear() {
+	cursor.UpAndClear(p.linesToClear)
+	p.linesToClear = 0
 }
 
 func (p Printer) Print(events model.Events) {
@@ -48,13 +54,21 @@ func (p Printer) Print(events model.Events) {
 			utils.NewNormalizer(s).Indent(2).Print()
 			cursor.StartOfLine()
 		case model.InProgressStep:
-			color.Set(colorFor[event.StepResult.Result])
+			p.clear()
 			s := fmt.Sprintf("%s%s", event.Step.Keyword, event.Step.Text)
+			utils.NewNormalizer(s).Indent(2).Print()
+			cursor.StartOfLine()
+			color.Set(colorFor[event.StepResult.Result])
 			percent := int(event.StepResult.Progress*float64(len(s))) - 1
 			if percent < 1 {
 				percent = 1
 			}
-			utils.NewNormalizer(s[:percent]).Indent(2).Print()
+			utils.NewNormalizer(s[:percent]).Indent(2).Println()
+			p.linesToClear = 1
+			if event.StepResult.Err != nil {
+				utils.NewNormalizer(event.StepResult.Err.Error()).Indent(3).Print()
+				p.linesToClear += strings.Count(event.StepResult.Err.Error(), "\n")
+			}
 			cursor.StartOfLine()
 		case model.FinishStep:
 			p.step(event.Step, event.StepResult)

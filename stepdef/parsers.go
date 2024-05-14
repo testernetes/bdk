@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -26,7 +26,7 @@ const (
 )
 
 func ParseFileToClientObject(ctx context.Context, path string, targetType reflect.Type) (_ reflect.Value, err error) {
-	manifest, err := ioutil.ReadFile(path)
+	manifest, err := os.ReadFile(path)
 	if err != nil {
 		return reflect.Value{}, err
 	}

@@ -59,6 +59,10 @@ func (s *StepRunner) Run() (result stepdef.StepResult, err error) {
 			result.Err = err
 			return
 		}
+
+		result.Err = nil
+		result.Result = stepdef.Passed
+		result.Messages = append(result.Messages, "Step passed")
 	}()
 
 	ret = s.Func.Call(s.Args)

@@ -136,7 +136,7 @@ func NewTestCommand() *cobra.Command {
 				}
 			}()
 
-			log.SetLogger(zap.New(zap.UseDevMode(debug)))
+			log.SetLogger(zap.New(zap.UseDevMode(debug), zap.WriteTo(os.Stderr)))
 			ctx = log.IntoContext(ctx, log.Log.WithCallDepth(1))
 
 			events := make(model.Events)

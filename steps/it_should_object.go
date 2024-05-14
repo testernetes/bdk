@@ -6,7 +6,6 @@ import (
 
 	"github.com/onsi/gomega/types"
 	"github.com/testernetes/bdk/stepdef"
-	"github.com/testernetes/gkube"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -17,7 +16,7 @@ import (
 
 var AsyncAssertFunc = func(ctx context.Context, t *stepdef.T, assert stepdef.Assert, timeout time.Duration, ref *unstructured.Unstructured, jsonpath string, desiredMatch bool, matcher types.GomegaMatcher) (err error) {
 
-	matcher = gkube.HaveJSONPath(jsonpath, matcher)
+	matcher = stepdef.NewHaveJSONPathMatcher(jsonpath, matcher)
 	deadline := time.After(timeout)
 
 	i, err := t.Client.Watch(ctx, ref, client.InNamespace(ref.GetNamespace()))
@@ -48,13 +47,15 @@ var AsyncAssertFunc = func(ctx context.Context, t *stepdef.T, assert stepdef.Ass
 			if event.Object.(client.Object).GetName() != ref.GetName() {
 				continue
 			}
+			t.Log.Info("event triggered assertion", "event", event)
 			var retry bool
 			retry, err = assert(desiredMatch, matcher, event.Object)
+			t.Log.Info("assertion", "retry", retry, "err", err)
+			t.Error(err)
 			if !retry {
 				return err
 			}
 		case <-time.Tick(300 * time.Millisecond):
-			t.Error(err)
 			t.SetProgressGivenDuration(timeout)
 		}
 	}
